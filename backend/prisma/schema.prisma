@@ -1,0 +1,355 @@
+// Cafe & Restaurant Management System — Prisma schema
+// Multi-tenant: every tenant-scoped table carries tenantId.
+// See planning/ARCHITECTURE.md section 4 for the ER diagram.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  super_admin
+  owner
+  manager
+  cashier
+  waiter
+  kitchen
+  accountant
+}
+
+enum TenantStatus {
+  signed_up
+  trial
+  configuring
+  active
+  suspended
+  churned
+}
+
+enum OrderType {
+  dine_in
+  takeaway
+  delivery
+}
+
+enum OrderStatus {
+  open
+  sent_to_kitchen
+  preparing
+  ready
+  served
+  completed
+  cancelled
+}
+
+enum TableStatus {
+  free
+  occupied
+  reserved
+}
+
+enum PaymentMethod {
+  cash
+  card
+  upi
+  wallet
+  online
+}
+
+enum PaymentStatus {
+  pending
+  paid
+  failed
+  refunded
+}
+
+enum TaxMode {
+  inclusive
+  exclusive
+}
+
+model Tenant {
+  id         String       @id @default(uuid())
+  name       String
+  subdomain  String       @unique
+  plan       String       @default("trial")
+  status     TenantStatus @default(signed_up)
+  businessType String?
+  country    String?
+  logoUrl    String?
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+
+  outlets       Outlet[]
+  users         User[]
+  subscriptions Subscription[]
+  menuCategories MenuCategory[]
+  menuItems     MenuItem[]
+  taxRules      TaxRule[]
+  customers     Customer[]
+  auditLogs     AuditLog[]
+
+  @@map("tenants")
+}
+
+model Outlet {
+  id              String   @id @default(uuid())
+  tenantId        String
+  name            String
+  addressLine     String?
+  city            String?
+  state           String?
+  postalCode      String?
+  phone           String?
+  email           String?
+  currency        String   @default("USD")
+  timezone        String   @default("UTC")
+  serviceTypes    String[] @default([])
+  seatingCapacity Int?
+  openingHours    Json?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  tenant   Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tables   RestaurantTable[]
+  orders   Order[]
+  registers RegisterShift[]
+
+  @@index([tenantId])
+  @@map("outlets")
+}
+
+model User {
+  id            String   @id @default(uuid())
+  tenantId      String?
+  outletId      String?
+  fullName      String
+  email         String
+  phone         String?
+  passwordHash  String
+  role          UserRole @default(owner)
+  isVerified    Boolean  @default(false)
+  posPin        String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  orders Order[]
+
+  @@unique([tenantId, email])
+  @@index([tenantId])
+  @@map("users")
+}
+
+model Subscription {
+  id          String    @id @default(uuid())
+  tenantId    String
+  plan        String    @default("trial")
+  status      String    @default("trial")
+  billingCycle String   @default("monthly")
+  trialEndsAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@map("subscriptions")
+}
+
+model MenuCategory {
+  id        String   @id @default(uuid())
+  tenantId  String
+  name      String
+  sortOrder Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  items  MenuItem[]
+
+  @@index([tenantId])
+  @@map("menu_categories")
+}
+
+model MenuItem {
+  id          String   @id @default(uuid())
+  tenantId    String
+  categoryId  String
+  name        String
+  description String?
+  price       Decimal  @db.Decimal(10, 2)
+  photoUrl    String?
+  isVeg       Boolean?
+  isAvailable Boolean  @default(true)
+  taxRuleId   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant     Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  category   MenuCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  taxRule    TaxRule?     @relation(fields: [taxRuleId], references: [id])
+  orderItems OrderItem[]
+
+  @@index([tenantId])
+  @@index([categoryId])
+  @@map("menu_items")
+}
+
+model TaxRule {
+  id        String   @id @default(uuid())
+  tenantId  String
+  name      String
+  rate      Decimal  @db.Decimal(5, 2)
+  mode      TaxMode  @default(exclusive)
+  regNumber String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant    Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  menuItems MenuItem[]
+
+  @@index([tenantId])
+  @@map("tax_rules")
+}
+
+model RestaurantTable {
+  id        String      @id @default(uuid())
+  tenantId  String
+  outletId  String
+  name      String
+  area      String?
+  capacity  Int         @default(2)
+  status    TableStatus @default(free)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  outlet Outlet  @relation(fields: [outletId], references: [id], onDelete: Cascade)
+  orders Order[]
+
+  @@index([tenantId])
+  @@index([outletId])
+  @@map("restaurant_tables")
+}
+
+model Customer {
+  id        String   @id @default(uuid())
+  tenantId  String
+  name      String?
+  phone     String?
+  email     String?
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  orders Order[]
+
+  @@index([tenantId])
+  @@map("customers")
+}
+
+model Order {
+  id          String      @id @default(uuid())
+  tenantId    String
+  outletId    String
+  tableId     String?
+  customerId  String?
+  createdById String?
+  type        OrderType   @default(dine_in)
+  status      OrderStatus @default(open)
+  subtotal    Decimal     @default(0) @db.Decimal(10, 2)
+  taxTotal    Decimal     @default(0) @db.Decimal(10, 2)
+  discount    Decimal     @default(0) @db.Decimal(10, 2)
+  total       Decimal     @default(0) @db.Decimal(10, 2)
+  notes       String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  outlet    Outlet           @relation(fields: [outletId], references: [id], onDelete: Cascade)
+  table     RestaurantTable? @relation(fields: [tableId], references: [id])
+  customer  Customer?        @relation(fields: [customerId], references: [id])
+  createdBy User?            @relation(fields: [createdById], references: [id])
+  items     OrderItem[]
+  payments  Payment[]
+
+  @@index([tenantId])
+  @@index([outletId])
+  @@index([status])
+  @@map("orders")
+}
+
+model OrderItem {
+  id         String   @id @default(uuid())
+  tenantId   String
+  orderId    String
+  menuItemId String
+  name       String
+  qty        Int      @default(1)
+  unitPrice  Decimal  @db.Decimal(10, 2)
+  modifiers  Json?
+  notes      String?
+  createdAt  DateTime @default(now())
+
+  order    Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  menuItem MenuItem @relation(fields: [menuItemId], references: [id])
+
+  @@index([tenantId])
+  @@index([orderId])
+  @@map("order_items")
+}
+
+model Payment {
+  id        String        @id @default(uuid())
+  tenantId  String
+  orderId   String
+  method    PaymentMethod @default(cash)
+  amount    Decimal       @db.Decimal(10, 2)
+  status    PaymentStatus @default(pending)
+  reference String?
+  createdAt DateTime      @default(now())
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([orderId])
+  @@map("payments")
+}
+
+model RegisterShift {
+  id          String    @id @default(uuid())
+  tenantId    String
+  outletId    String
+  openedById  String?
+  openingCash Decimal   @default(0) @db.Decimal(10, 2)
+  closingCash Decimal?  @db.Decimal(10, 2)
+  openedAt    DateTime  @default(now())
+  closedAt    DateTime?
+
+  outlet Outlet @relation(fields: [outletId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([outletId])
+  @@map("register_shifts")
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  tenantId  String?
+  userId    String?
+  action    String
+  entity    String?
+  entityId  String?
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId])
+  @@map("audit_logs")
+}

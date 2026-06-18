@@ -1,0 +1,23 @@
+{
+  "name": "cafe-management",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Multi-tenant Cafe & Restaurant Management System",
+  "engines": {
+    "node": ">=20"
+  },
+  "packageManager": "pnpm@11.7.0",
+  "scripts": {
+    "dev:backend": "pnpm --filter @cafe/backend start:dev",
+    "dev:frontend": "pnpm --filter @cafe/frontend dev",
+    "build": "pnpm -r build",
+    "lint": "pnpm -r lint",
+    "test": "pnpm -r test",
+    "db:up": "docker compose up -d",
+    "db:down": "docker compose down"
+  },
+  "devDependencies": {
+    "prettier": "^3.3.3",
+    "typescript": "^5.6.3"
+  }
+}
