@@ -1,0 +1,77 @@
+@import "tailwindcss";
+
+/*
+ * DESIGN TOKENS — single source of truth for the whole app.
+ * Components never use raw hex values; they reference these tokens
+ * (e.g. bg-surface, text-muted, rounded-md). Change a value here and
+ * every screen updates together. This is what keeps the UI consistent
+ * and makes rebranding / dark mode a token swap rather than a rewrite.
+ */
+:root {
+  /* Brand */
+  --color-primary: #4f46e5;        /* indigo */
+  --color-primary-hover: #4338ca;
+  --color-primary-fg: #ffffff;
+  --color-accent: #0ea5e9;         /* sky */
+  --color-accent-fg: #ffffff;
+
+  /* Surfaces & text */
+  --color-bg: #f8fafc;
+  --color-surface: #ffffff;
+  --color-surface-muted: #f1f5f9;
+  --color-border: #e2e8f0;
+  --color-text: #0f172a;
+  --color-text-muted: #64748b;
+
+  /* Status */
+  --color-success: #16a34a;
+  --color-warning: #d97706;
+  --color-danger: #dc2626;
+  --color-info: #2563eb;
+
+  /* Radius scale */
+  --radius-sm: 0.375rem;  /* 6px */
+  --radius-md: 0.625rem;  /* 10px */
+  --radius-lg: 0.875rem;  /* 14px */
+}
+
+/*
+ * Map tokens into Tailwind's theme so utilities like `bg-primary`,
+ * `text-muted`, `border-border`, `rounded-md` resolve to the tokens above.
+ */
+@theme inline {
+  --color-primary: var(--color-primary);
+  --color-primary-hover: var(--color-primary-hover);
+  --color-primary-fg: var(--color-primary-fg);
+  --color-accent: var(--color-accent);
+  --color-accent-fg: var(--color-accent-fg);
+
+  --color-bg: var(--color-bg);
+  --color-surface: var(--color-surface);
+  --color-surface-muted: var(--color-surface-muted);
+  --color-border: var(--color-border);
+  --color-text: var(--color-text);
+  --color-muted: var(--color-text-muted);
+
+  --color-success: var(--color-success);
+  --color-warning: var(--color-warning);
+  --color-danger: var(--color-danger);
+  --color-info: var(--color-info);
+
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+}
+
+* {
+  border-color: var(--color-border);
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}

@@ -7,7 +7,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import * as argon2 from 'argon2';
-import type { LoginInput, SignupInput, VerifyOtpInput } from '@cafe/shared';
+import type { LoginInput, SignupInput, VerifyOtpInput, StaffLoginInput } from '@cafe/shared';
 import { UserRole } from '@cafe/shared';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { RedisService } from '../../common/redis/redis.service';
@@ -76,7 +76,7 @@ export class AuthService {
     }
     await this.prisma.user.update({ where: { id: user.id }, data: { isVerified: true } });
     await this.redis.del(`otp:${input.email}`);
-    return this.issueTokens(user.id, user.tenantId, user.role, user.email);
+    return this.issueTokens(user.id, user.tenantId, user.role, user.email ?? input.email);
   }
 
   async login(input: LoginInput): Promise<TokenPair> {
@@ -91,7 +91,34 @@ export class AuthService {
     if (!user.isVerified) {
       throw new UnauthorizedException('Account not verified');
     }
-    return this.issueTokens(user.id, user.tenantId, user.role, user.email);
+    return this.issueTokens(user.id, user.tenantId, user.role, user.email ?? '');
+  }
+
+  /**
+   * Staff login: scoped by workspace subdomain so usernames only need to be
+   * unique within a tenant (e.g. two cafes can both have a "chef1").
+   */
+  async staffLogin(input: StaffLoginInput): Promise<TokenPair> {
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { subdomain: input.subdomain },
+    });
+    if (!tenant) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+    const user = await this.prisma.user.findFirst({
+      where: { tenantId: tenant.id, username: input.username },
+    });
+    if (!user) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+    const valid = await argon2.verify(user.passwordHash, input.password);
+    if (!valid) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+    if (!user.isActive) {
+      throw new UnauthorizedException('Account is disabled');
+    }
+    return this.issueTokens(user.id, user.tenantId, user.role, user.email ?? user.username ?? '');
   }
 
   async refresh(refreshToken: string): Promise<{ accessToken: string }> {
@@ -111,6 +138,17 @@ export class AuthService {
     } catch {
       throw new UnauthorizedException('Invalid refresh token');
     }
+  }
+
+  /** Public wrapper so other modules (e.g. onboarding) can re-issue tokens after the
+   * user's tenant/role changes — for example once a tenant is created during onboarding. */
+  async issueTokensForUser(user: {
+    id: string;
+    tenantId: string | null;
+    role: string;
+    email: string;
+  }): Promise<TokenPair> {
+    return this.issueTokens(user.id, user.tenantId, user.role, user.email);
   }
 
   private async issueTokens(

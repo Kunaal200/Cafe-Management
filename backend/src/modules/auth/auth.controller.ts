@@ -4,10 +4,12 @@ import {
   loginSchema,
   refreshSchema,
   signupSchema,
+  staffLoginSchema,
   verifyOtpSchema,
   type LoginInput,
   type RefreshInput,
   type SignupInput,
+  type StaffLoginInput,
   type VerifyOtpInput,
 } from '@cafe/shared';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
@@ -39,6 +41,13 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   login(@Body(new ZodValidationPipe(loginSchema)) body: LoginInput) {
     return this.auth.login(body);
+  }
+
+  @Public()
+  @Post('staff-login')
+  @HttpCode(HttpStatus.OK)
+  staffLogin(@Body(new ZodValidationPipe(staffLoginSchema)) body: StaffLoginInput) {
+    return this.auth.staffLogin(body);
   }
 
   @Public()

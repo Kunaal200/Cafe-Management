@@ -10,6 +10,14 @@ import { TenantContextMiddleware } from './common/tenancy/tenant-context.middlew
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
 import { RolesGuard } from './modules/auth/guards/roles.guard';
 import { AuthModule } from './modules/auth/auth.module';
+import { OnboardingModule } from './modules/onboarding/onboarding.module';
+import { MenuModule } from './modules/menu/menu.module';
+import { StaffModule } from './modules/staff/staff.module';
+import { TablesModule } from './modules/tables/tables.module';
+import { OrdersModule } from './modules/orders/orders.module';
+import { PaymentsModule } from './modules/payments/payments.module';
+import { RegisterModule } from './modules/register/register.module';
+import { SubscriptionModule } from './modules/subscription/subscription.module';
 import { HealthModule } from './modules/health/health.module';
 
 @Module({
@@ -22,6 +30,14 @@ import { HealthModule } from './modules/health/health.module';
     PrismaModule,
     RedisModule,
     AuthModule,
+    OnboardingModule,
+    MenuModule,
+    StaffModule,
+    TablesModule,
+    OrdersModule,
+    PaymentsModule,
+    RegisterModule,
+    SubscriptionModule,
     HealthModule,
   ],
   providers: [

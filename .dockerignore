@@ -1,0 +1,14 @@
+**/node_modules
+**/.next
+**/dist
+**/.turbo
+backend/tsconfig.tsbuildinfo
+**/*.tsbuildinfo
+.git
+.gitignore
+**/.env
+**/.env.*
+**/coverage
+**/*.log
+planning
+README.md

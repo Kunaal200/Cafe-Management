@@ -128,11 +128,13 @@ model User {
   tenantId      String?
   outletId      String?
   fullName      String
-  email         String
+  email         String?
+  username      String?
   phone         String?
   passwordHash  String
   role          UserRole @default(owner)
   isVerified    Boolean  @default(false)
+  isActive      Boolean  @default(true)
   posPin        String?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
@@ -141,6 +143,7 @@ model User {
   orders Order[]
 
   @@unique([tenantId, email])
+  @@unique([tenantId, username])
   @@index([tenantId])
   @@map("users")
 }

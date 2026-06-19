@@ -95,15 +95,16 @@
 
 ## Stage 4 — Backend MVP endpoints (P0 + P1)
 - [x] Auth: signup, login, verify OTP, refresh, me (logout = client token discard for now)
-- [ ] Onboarding: create tenant, create outlet, set localization/tax, seed menu/tables (see `ONBOARDING.md`)
-- [ ] Tenants/Outlets CRUD
-- [ ] Menu: categories & items CRUD, availability toggle
-- [ ] Tables/floor: CRUD + status
-- [ ] Orders: create, add/update items, send KOT, list, detail, status transitions
-- [ ] Checkout: apply discount/tax, payments, split bill, receipt data
-- [ ] Register/shift: open/close, cash reconciliation
-- [ ] Subscriptions: plan/trial basics
-- [ ] Write tests for each endpoint group
+- [x] Staff: owner creates username/password accounts with roles (kitchen/cashier/etc.); tenant-scoped staff login via subdomain+username
+- [x] Onboarding: create tenant, create outlet, set localization/tax, seed menu/tables (see `ONBOARDING.md`)
+- [ ] Tenants/Outlets CRUD — partial (created via onboarding; standalone CRUD pending)
+- [x] Menu: categories & items CRUD, availability toggle
+- [x] Tables/floor: CRUD + status
+- [x] Orders: create, add/update items, send KOT, list, detail, status transitions (validated lifecycle)
+- [x] Checkout: apply discount, payments, split bill, finalize (frees table) — receipt data via order detail
+- [x] Register/shift: open/close, cash reconciliation
+- [x] Subscriptions: plan/trial basics (read current + change plan)
+- [ ] Write tests for each endpoint group — verified via manual smoke tests; automated tests pending
 
 ---
 
