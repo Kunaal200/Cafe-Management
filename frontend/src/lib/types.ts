@@ -101,3 +101,12 @@ export interface MeResponse {
   role: string;
   email: string;
 }
+
+export interface PaymentSummary {
+  orderId: string;
+  total: number;
+  paid: number;
+  balance: number;
+  fullyPaid: boolean;
+  payments: Payment[];
+}

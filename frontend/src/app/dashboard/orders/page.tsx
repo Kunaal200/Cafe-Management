@@ -2,13 +2,18 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Plus } from "lucide-react";
 import { OrderStatus } from "@cafe/shared";
 import { useOutlet } from "@/features/dashboard/outlet-context";
+import { useSession } from "@/features/dashboard/session-context";
+import { NewOrderModal } from "@/features/dashboard/new-order-modal";
 import { PageHeader, Card, StateBlock } from "@/features/dashboard/ui";
 import { Badge } from "@/design-system/badge";
+import { Button } from "@/design-system/button";
 import { useApi } from "@/lib/use-api";
 import type { Order } from "@/lib/types";
 import { money, dateTime, humanize, orderStatusVariant } from "@/lib/format";
+import { canTakeOrders } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
 
 const FILTERS: { value: string; label: string }[] = [
@@ -25,7 +30,9 @@ const FILTERS: { value: string; label: string }[] = [
 export default function OrdersPage() {
   const router = useRouter();
   const { selected, currency } = useOutlet();
+  const session = useSession();
   const [status, setStatus] = useState("");
+  const [newOrderOpen, setNewOrderOpen] = useState(false);
 
   const query = selected
     ? `/orders?outletId=${selected.id}${status ? `&status=${status}` : ""}`
@@ -35,7 +42,17 @@ export default function OrdersPage() {
 
   return (
     <>
-      <PageHeader title="Orders" subtitle="All orders for this outlet." />
+      <PageHeader
+        title="Orders"
+        subtitle="All orders for this outlet."
+        actions={
+          canTakeOrders(session.role) ? (
+            <Button onClick={() => setNewOrderOpen(true)} disabled={!selected}>
+              <Plus className="h-4 w-4" /> New order
+            </Button>
+          ) : undefined
+        }
+      />
 
       <div className="mb-4 flex flex-wrap gap-2">
         {FILTERS.map((f) => (
@@ -96,6 +113,8 @@ export default function OrdersPage() {
           </table>
         </Card>
       </StateBlock>
+
+      <NewOrderModal open={newOrderOpen} onClose={() => setNewOrderOpen(false)} />
     </>
   );
 }

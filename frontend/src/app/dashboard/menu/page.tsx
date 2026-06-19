@@ -10,6 +10,8 @@ import { Field } from "@/design-system/field";
 import { Input } from "@/design-system/input";
 import { Select } from "@/design-system/select";
 import { Modal } from "@/design-system/modal";
+import { useConfirm } from "@/design-system/confirm-dialog";
+import { useToast } from "@/features/dashboard/toast";
 import { useApi } from "@/lib/use-api";
 import { apiFetch, ApiError } from "@/lib/api";
 import type { MenuCategory, MenuItem } from "@/lib/types";
@@ -25,6 +27,8 @@ interface ItemDraft {
 
 export default function MenuPage() {
   const { currency } = useOutlet();
+  const confirm = useConfirm();
+  const toast = useToast();
   const categories = useApi<MenuCategory[]>("/menu/categories");
   const items = useApi<MenuItem[]>("/menu/items");
 
@@ -50,6 +54,7 @@ export default function MenuPage() {
       await apiFetch("/menu/categories", { method: "POST", body: { name: catName.trim() }, auth: true });
       setCatName("");
       setCatModal(false);
+      toast.success("Category created");
       categories.refetch();
     } catch (err) {
       setFormError(err instanceof ApiError ? err.message : "Could not create category.");
@@ -59,9 +64,20 @@ export default function MenuPage() {
   }
 
   async function deleteCategory(id: string) {
-    if (!confirm("Delete this category and its items?")) return;
-    await apiFetch(`/menu/categories/${id}`, { method: "DELETE", auth: true });
-    refetchAll();
+    const ok = await confirm({
+      title: "Delete category?",
+      description: "This also deletes its items. This cannot be undone.",
+      confirmLabel: "Delete",
+      danger: true,
+    });
+    if (!ok) return;
+    try {
+      await apiFetch(`/menu/categories/${id}`, { method: "DELETE", auth: true });
+      toast.success("Category deleted");
+      refetchAll();
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Could not delete category.");
+    }
   }
 
   function openNewItem() {
@@ -105,6 +121,7 @@ export default function MenuPage() {
         });
       }
       setItemDraft(null);
+      toast.success(itemDraft.id ? "Item updated" : "Item created");
       items.refetch();
     } catch (err) {
       setFormError(err instanceof ApiError ? err.message : "Could not save item.");
@@ -114,18 +131,34 @@ export default function MenuPage() {
   }
 
   async function toggleAvailability(it: MenuItem) {
-    await apiFetch(`/menu/items/${it.id}/availability`, {
-      method: "PATCH",
-      body: { isAvailable: !it.isAvailable },
-      auth: true,
-    });
-    items.refetch();
+    try {
+      await apiFetch(`/menu/items/${it.id}/availability`, {
+        method: "PATCH",
+        body: { isAvailable: !it.isAvailable },
+        auth: true,
+      });
+      toast.success(it.isAvailable ? "Marked unavailable" : "Marked available");
+      items.refetch();
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Could not update availability.");
+    }
   }
 
   async function deleteItem(id: string) {
-    if (!confirm("Delete this item?")) return;
-    await apiFetch(`/menu/items/${id}`, { method: "DELETE", auth: true });
-    items.refetch();
+    const ok = await confirm({
+      title: "Delete item?",
+      description: "This cannot be undone.",
+      confirmLabel: "Delete",
+      danger: true,
+    });
+    if (!ok) return;
+    try {
+      await apiFetch(`/menu/items/${id}`, { method: "DELETE", auth: true });
+      toast.success("Item deleted");
+      items.refetch();
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Could not delete item.");
+    }
   }
 
   return (

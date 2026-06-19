@@ -1,59 +1,154 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, Send } from "lucide-react";
+import { ArrowLeft, CheckCircle2 } from "lucide-react";
 import { OrderStatus } from "@cafe/shared";
 import { useOutlet } from "@/features/dashboard/outlet-context";
+import { useSession } from "@/features/dashboard/session-context";
+import { useToast } from "@/features/dashboard/toast";
 import { PageHeader, Card, StateBlock } from "@/features/dashboard/ui";
+import { MenuCatalog } from "@/features/dashboard/order/menu-catalog";
+import { OrderCart } from "@/features/dashboard/order/order-cart";
+import { LifecycleActions } from "@/features/dashboard/order/lifecycle-actions";
+import { CheckoutPanel } from "@/features/dashboard/order/checkout-panel";
 import { Badge } from "@/design-system/badge";
-import { Button } from "@/design-system/button";
+import { useConfirm } from "@/design-system/confirm-dialog";
 import { useApi } from "@/lib/use-api";
 import { apiFetch, ApiError } from "@/lib/api";
-import type { Order } from "@/lib/types";
-import { money, dateTime, humanize, orderStatusVariant } from "@/lib/format";
+import { canHandleMoney } from "@/lib/permissions";
+import type { Order, OrderItem, MenuItem } from "@/lib/types";
+import { dateTime, humanize, orderStatusVariant } from "@/lib/format";
 
-/** Status transitions that go through the generic status endpoint. */
-const NEXT_STATUS: Record<string, { status: string; label: string }[]> = {
-  [OrderStatus.SENT_TO_KITCHEN]: [{ status: OrderStatus.PREPARING, label: "Start preparing" }],
-  [OrderStatus.PREPARING]: [{ status: OrderStatus.READY, label: "Mark ready" }],
-  [OrderStatus.READY]: [{ status: OrderStatus.SERVED, label: "Mark served" }],
-  [OrderStatus.SERVED]: [{ status: OrderStatus.COMPLETED, label: "Complete order" }],
-};
+const TERMINAL: string[] = [OrderStatus.COMPLETED, OrderStatus.CANCELLED];
 
-const CANCELLABLE = [
-  OrderStatus.OPEN,
-  OrderStatus.SENT_TO_KITCHEN,
-  OrderStatus.PREPARING,
-] as string[];
-
-export default function OrderDetailPage() {
+export default function OrderWorkspacePage() {
   const router = useRouter();
   const params = useParams<{ id: string }>();
   const { currency } = useOutlet();
-  const { data, error, loading, refetch } = useApi<Order>(
+  const session = useSession();
+  const toast = useToast();
+  const confirm = useConfirm();
+
+  const { data: order, error, loading, refetch } = useApi<Order>(
     params.id ? `/orders/${params.id}` : null,
   );
   const [busy, setBusy] = useState(false);
-  const [actionError, setActionError] = useState<string | null>(null);
 
-  async function run(fn: () => Promise<unknown>) {
+  const isOpen = order?.status === OrderStatus.OPEN;
+  const isTerminal = order ? TERMINAL.includes(order.status) : false;
+  const showCheckout = order != null && !isTerminal && canHandleMoney(session.role);
+
+  /** Run a mutation with busy-state + toast handling, refetching on success. */
+  async function run(fn: () => Promise<unknown>, success: string) {
     setBusy(true);
-    setActionError(null);
     try {
       await fn();
+      toast.success(success);
       refetch();
     } catch (err) {
-      setActionError(err instanceof ApiError ? err.message : "Action failed.");
+      toast.error(err instanceof ApiError ? err.message : "Action failed.");
     } finally {
       setBusy(false);
     }
   }
 
-  const order = data;
-  const transitions = order ? (NEXT_STATUS[order.status] ?? []) : [];
-  const canSendToKitchen = order?.status === OrderStatus.OPEN && order.items.length > 0;
-  const canCancel = order ? CANCELLABLE.includes(order.status) : false;
+  function addItem(item: MenuItem) {
+    if (!order) return;
+    run(
+      () =>
+        apiFetch(`/orders/${order.id}/items`, {
+          method: "POST",
+          body: { items: [{ menuItemId: item.id, qty: 1 }] },
+          auth: true,
+        }),
+      `Added ${item.name}`,
+    );
+  }
+
+  function changeQty(item: OrderItem, qty: number) {
+    if (!order) return;
+    run(
+      () =>
+        apiFetch(`/orders/${order.id}/items/${item.id}`, {
+          method: "PATCH",
+          body: { qty },
+          auth: true,
+        }),
+      "Quantity updated",
+    );
+  }
+
+  function saveNote(item: OrderItem, note: string) {
+    if (!order) return;
+    run(
+      () =>
+        apiFetch(`/orders/${order.id}/items/${item.id}`, {
+          method: "PATCH",
+          body: { notes: note || null },
+          auth: true,
+        }),
+      "Note saved",
+    );
+  }
+
+  async function removeItem(item: OrderItem) {
+    if (!order) return;
+    const ok = await confirm({
+      title: "Remove item?",
+      description: `Remove "${item.name}" from this order?`,
+      confirmLabel: "Remove",
+      danger: true,
+    });
+    if (!ok) return;
+    run(
+      () => apiFetch(`/orders/${order.id}/items/${item.id}`, { method: "DELETE", auth: true }),
+      "Item removed",
+    );
+  }
+
+  function sendKitchen() {
+    if (!order) return;
+    run(
+      () => apiFetch(`/orders/${order.id}/send-kitchen`, { method: "POST", auth: true }),
+      "Sent to kitchen",
+    );
+  }
+
+  function advance(status: string) {
+    if (!order) return;
+    run(
+      () =>
+        apiFetch(`/orders/${order.id}/status`, {
+          method: "PATCH",
+          body: { status },
+          auth: true,
+        }),
+      "Status updated",
+    );
+  }
+
+  async function cancelOrder() {
+    if (!order) return;
+    const ok = await confirm({
+      title: "Cancel order?",
+      description: "This cannot be undone.",
+      confirmLabel: "Cancel order",
+      cancelLabel: "Keep order",
+      danger: true,
+    });
+    if (!ok) return;
+    run(
+      () =>
+        apiFetch(`/orders/${order.id}/status`, {
+          method: "PATCH",
+          body: { status: OrderStatus.CANCELLED },
+          auth: true,
+        }),
+      "Order cancelled",
+    );
+  }
 
   return (
     <>
@@ -65,7 +160,7 @@ export default function OrderDetailPage() {
         <ArrowLeft className="h-4 w-4" /> Back to orders
       </button>
 
-      <StateBlock loading={loading && !data} error={error} empty={!order && !loading}>
+      <StateBlock loading={loading && !order} error={error} empty={!order && !loading}>
         {order && (
           <>
             <PageHeader
@@ -74,148 +169,58 @@ export default function OrderDetailPage() {
               actions={<Badge variant={orderStatusVariant(order.status)}>{humanize(order.status)}</Badge>}
             />
 
-            {actionError && (
-              <div className="mb-4 rounded-md border border-danger/30 bg-danger/10 px-4 py-2 text-sm text-danger">
-                {actionError}
+            {order.status === OrderStatus.COMPLETED && (
+              <div className="mb-6 flex items-center gap-3 rounded-lg border border-success/30 bg-success/10 px-4 py-3 text-sm text-success">
+                <CheckCircle2 className="h-5 w-5" />
+                <span className="flex-1">Order completed and paid.</span>
+                <Link href="/dashboard/orders" className="font-medium underline">
+                  Back to orders
+                </Link>
               </div>
             )}
 
             <div className="grid gap-6 lg:grid-cols-3">
-              {/* Items + totals */}
-              <Card className="lg:col-span-2 p-0">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted">
-                      <th className="px-5 py-3 font-medium">Item</th>
-                      <th className="px-5 py-3 font-medium">Qty</th>
-                      <th className="px-5 py-3 text-right font-medium">Price</th>
-                      <th className="px-5 py-3 text-right font-medium">Line</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border">
-                    {order.items.map((it) => (
-                      <tr key={it.id}>
-                        <td className="px-5 py-3">
-                          <p className="font-medium text-text">{it.name}</p>
-                          {it.notes && <p className="text-xs text-muted">{it.notes}</p>}
-                        </td>
-                        <td className="px-5 py-3 text-muted">{it.qty}</td>
-                        <td className="px-5 py-3 text-right text-muted">{money(it.unitPrice, currency)}</td>
-                        <td className="px-5 py-3 text-right font-medium text-text">
-                          {money(Number(it.unitPrice) * it.qty, currency)}
-                        </td>
-                      </tr>
-                    ))}
-                    {order.items.length === 0 && (
-                      <tr>
-                        <td colSpan={4} className="px-5 py-8 text-center text-muted">
-                          No items on this order yet.
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
+              {/* Left: menu catalog while building */}
+              {isOpen && (
+                <Card className="lg:col-span-2">
+                  <h2 className="mb-3 text-sm font-semibold text-text">Add items</h2>
+                  <MenuCatalog onAdd={addItem} adding={busy} />
+                </Card>
+              )}
 
-                <div className="space-y-1 border-t border-border px-5 py-4 text-sm">
-                  <div className="flex justify-between text-muted">
-                    <span>Subtotal</span>
-                    <span>{money(order.subtotal, currency)}</span>
-                  </div>
-                  <div className="flex justify-between text-muted">
-                    <span>Tax</span>
-                    <span>{money(order.taxTotal, currency)}</span>
-                  </div>
-                  {Number(order.discount) > 0 && (
-                    <div className="flex justify-between text-muted">
-                      <span>Discount</span>
-                      <span>-{money(order.discount, currency)}</span>
-                    </div>
-                  )}
-                  <div className="flex justify-between pt-1 text-base font-semibold text-text">
-                    <span>Total</span>
-                    <span>{money(order.total, currency)}</span>
-                  </div>
-                </div>
-              </Card>
-
-              {/* Actions + payments */}
-              <div className="space-y-6">
+              {/* Right: cart + actions + checkout (full width if not building) */}
+              <div className={isOpen ? "space-y-6" : "space-y-6 lg:col-span-3"}>
                 <Card>
-                  <h3 className="mb-3 text-sm font-semibold text-text">Actions</h3>
-                  <div className="space-y-2">
-                    {canSendToKitchen && (
-                      <Button
-                        className="w-full"
-                        disabled={busy}
-                        onClick={() =>
-                          run(() => apiFetch(`/orders/${order.id}/send-kitchen`, { method: "POST", auth: true }))
-                        }
-                      >
-                        <Send className="h-4 w-4" /> Send to kitchen
-                      </Button>
-                    )}
-                    {transitions.map((t) => (
-                      <Button
-                        key={t.status}
-                        className="w-full"
-                        disabled={busy}
-                        onClick={() =>
-                          run(() =>
-                            apiFetch(`/orders/${order.id}/status`, {
-                              method: "PATCH",
-                              body: { status: t.status },
-                              auth: true,
-                            }),
-                          )
-                        }
-                      >
-                        {t.label}
-                      </Button>
-                    ))}
-                    {canCancel && (
-                      <Button
-                        variant="danger"
-                        className="w-full"
-                        disabled={busy}
-                        onClick={() =>
-                          run(() =>
-                            apiFetch(`/orders/${order.id}/status`, {
-                              method: "PATCH",
-                              body: { status: OrderStatus.CANCELLED },
-                              auth: true,
-                            }),
-                          )
-                        }
-                      >
-                        Cancel order
-                      </Button>
-                    )}
-                    {!canSendToKitchen && transitions.length === 0 && !canCancel && (
-                      <p className="text-sm text-muted">No further actions for this order.</p>
-                    )}
-                  </div>
+                  <h2 className="mb-3 text-sm font-semibold text-text">Order</h2>
+                  <OrderCart
+                    order={order}
+                    editable={isOpen && !busy}
+                    busy={busy}
+                    onChangeQty={changeQty}
+                    onSaveNote={saveNote}
+                    onRemove={removeItem}
+                  />
                 </Card>
 
-                <Card>
-                  <h3 className="mb-3 text-sm font-semibold text-text">Payments</h3>
-                  {order.payments && order.payments.length > 0 ? (
-                    <ul className="space-y-2 text-sm">
-                      {order.payments.map((p) => (
-                        <li key={p.id} className="flex items-center justify-between">
-                          <span className="text-muted">{humanize(p.method)}</span>
-                          <span className="flex items-center gap-2">
-                            <span className="font-medium text-text">{money(p.amount, currency)}</span>
-                            <Badge variant={p.status === "paid" ? "success" : "neutral"}>
-                              {humanize(p.status)}
-                            </Badge>
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <p className="text-sm text-muted">No payments recorded.</p>
-                  )}
-                </Card>
+                {!isTerminal && (
+                  <Card>
+                    <h2 className="mb-3 text-sm font-semibold text-text">Actions</h2>
+                    <LifecycleActions
+                      order={order}
+                      busy={busy}
+                      onSendKitchen={sendKitchen}
+                      onAdvance={advance}
+                      onCancel={cancelOrder}
+                    />
+                  </Card>
+                )}
+
+                {showCheckout && (
+                  <Card>
+                    <h2 className="mb-3 text-sm font-semibold text-text">Checkout</h2>
+                    <CheckoutPanel order={order} currency={currency} onChanged={refetch} />
+                  </Card>
+                )}
               </div>
             </div>
           </>

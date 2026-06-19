@@ -6,17 +6,21 @@ import { apiFetch, ApiError } from "@/lib/api";
 import { clearTokens, isAuthenticated } from "@/lib/auth";
 import type { MeResponse } from "@/lib/types";
 import { OutletProvider } from "@/features/dashboard/outlet-context";
+import { SessionProvider } from "@/features/dashboard/session-context";
+import { ToastProvider } from "@/features/dashboard/toast";
+import { ConfirmProvider } from "@/design-system/confirm-dialog";
 import { DashboardShell } from "@/features/dashboard/shell";
 import { Spinner } from "@/features/dashboard/ui";
 
 /**
  * Guards the whole /dashboard area: must be authenticated AND have a tenant
  * (owners without a business are sent to onboarding). Renders the shell +
- * outlet provider once cleared, so child pages can assume both.
+ * providers once cleared, so child pages can assume an authenticated session,
+ * an outlet context, toasts, and confirmation dialogs.
  */
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
-  const [ready, setReady] = useState(false);
+  const [me, setMe] = useState<MeResponse | null>(null);
 
   useEffect(() => {
     if (!isAuthenticated()) {
@@ -24,11 +28,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       return;
     }
     apiFetch<MeResponse>("/auth/me", { auth: true })
-      .then((me) => {
-        if (!me.tenantId) {
+      .then((data) => {
+        if (!data.tenantId) {
           router.replace("/onboarding");
         } else {
-          setReady(true);
+          setMe(data);
         }
       })
       .catch((err) => {
@@ -37,7 +41,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       });
   }, [router]);
 
-  if (!ready) {
+  if (!me) {
     return (
       <div className="flex min-h-screen items-center justify-center gap-2 bg-bg text-sm text-muted">
         <Spinner /> Loading your workspace…
@@ -46,8 +50,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }
 
   return (
-    <OutletProvider>
-      <DashboardShell>{children}</DashboardShell>
-    </OutletProvider>
+    <SessionProvider value={me}>
+      <ToastProvider>
+        <ConfirmProvider>
+          <OutletProvider>
+            <DashboardShell>{children}</DashboardShell>
+          </OutletProvider>
+        </ConfirmProvider>
+      </ToastProvider>
+    </SessionProvider>
   );
 }

@@ -10,6 +10,8 @@ import { Badge } from "@/design-system/badge";
 import { Field } from "@/design-system/field";
 import { Input } from "@/design-system/input";
 import { Modal } from "@/design-system/modal";
+import { useConfirm } from "@/design-system/confirm-dialog";
+import { useToast } from "@/features/dashboard/toast";
 import { useApi } from "@/lib/use-api";
 import { apiFetch, ApiError } from "@/lib/api";
 import type { RestaurantTable } from "@/lib/types";
@@ -23,6 +25,8 @@ const STATUS_CYCLE: Record<string, string> = {
 
 export default function TablesPage() {
   const { selected } = useOutlet();
+  const confirm = useConfirm();
+  const toast = useToast();
   const { data, error, loading, refetch } = useApi<RestaurantTable[]>(
     selected ? `/tables?outletId=${selected.id}` : null,
   );
@@ -59,6 +63,7 @@ export default function TablesPage() {
       setArea("");
       setCapacity("2");
       setModal(false);
+      toast.success("Table added");
       refetch();
     } catch (err) {
       setFormError(err instanceof ApiError ? err.message : "Could not create table.");
@@ -68,18 +73,33 @@ export default function TablesPage() {
   }
 
   async function cycleStatus(t: RestaurantTable) {
-    await apiFetch(`/tables/${t.id}/status`, {
-      method: "PATCH",
-      body: { status: STATUS_CYCLE[t.status] },
-      auth: true,
-    });
-    refetch();
+    try {
+      await apiFetch(`/tables/${t.id}/status`, {
+        method: "PATCH",
+        body: { status: STATUS_CYCLE[t.status] },
+        auth: true,
+      });
+      refetch();
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Could not update table status.");
+    }
   }
 
   async function deleteTable(id: string) {
-    if (!confirm("Delete this table?")) return;
-    await apiFetch(`/tables/${id}`, { method: "DELETE", auth: true });
-    refetch();
+    const ok = await confirm({
+      title: "Delete table?",
+      description: "This cannot be undone.",
+      confirmLabel: "Delete",
+      danger: true,
+    });
+    if (!ok) return;
+    try {
+      await apiFetch(`/tables/${id}`, { method: "DELETE", auth: true });
+      toast.success("Table deleted");
+      refetch();
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Could not delete table.");
+    }
   }
 
   return (
