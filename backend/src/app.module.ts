@@ -11,6 +11,7 @@ import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
 import { RolesGuard } from './modules/auth/guards/roles.guard';
 import { AuthModule } from './modules/auth/auth.module';
 import { OnboardingModule } from './modules/onboarding/onboarding.module';
+import { OutletsModule } from './modules/outlets/outlets.module';
 import { MenuModule } from './modules/menu/menu.module';
 import { StaffModule } from './modules/staff/staff.module';
 import { TablesModule } from './modules/tables/tables.module';
@@ -31,6 +32,7 @@ import { HealthModule } from './modules/health/health.module';
     RedisModule,
     AuthModule,
     OnboardingModule,
+    OutletsModule,
     MenuModule,
     StaffModule,
     TablesModule,

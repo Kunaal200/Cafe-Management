@@ -1,103 +1,120 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { LogOut } from "lucide-react";
-import { Button } from "@/design-system/button";
+import Link from "next/link";
+import { ReceiptText, Clock, CheckCircle2, IndianRupee, ArrowRight } from "lucide-react";
+import { useOutlet } from "@/features/dashboard/outlet-context";
+import { PageHeader, Card, StateBlock } from "@/features/dashboard/ui";
 import { Badge } from "@/design-system/badge";
-import { apiFetch, ApiError } from "@/lib/api";
-import { clearTokens, isAuthenticated } from "@/lib/auth";
+import { useApi } from "@/lib/use-api";
+import type { Order } from "@/lib/types";
+import { money, timeAgo, humanize, orderStatusVariant, LIVE_STATUSES } from "@/lib/format";
 
-interface MeResponse {
-  sub: string;
-  tenantId: string | null;
-  role: string;
-  email: string;
+function isToday(iso: string): boolean {
+  const d = new Date(iso);
+  const now = new Date();
+  return (
+    d.getFullYear() === now.getFullYear() &&
+    d.getMonth() === now.getMonth() &&
+    d.getDate() === now.getDate()
+  );
 }
 
-export default function DashboardPage() {
-  const router = useRouter();
-  const [me, setMe] = useState<MeResponse | null>(null);
-  const [error, setError] = useState<string | null>(null);
+function Stat({
+  label,
+  value,
+  icon: Icon,
+}: {
+  label: string;
+  value: string;
+  icon: React.ComponentType<{ className?: string }>;
+}) {
+  return (
+    <Card className="flex items-center gap-4">
+      <span className="flex h-11 w-11 items-center justify-center rounded-lg bg-primary/10 text-primary">
+        <Icon className="h-5 w-5" />
+      </span>
+      <div>
+        <p className="text-sm text-muted">{label}</p>
+        <p className="text-xl font-bold text-text">{value}</p>
+      </div>
+    </Card>
+  );
+}
 
-  useEffect(() => {
-    if (!isAuthenticated()) {
-      router.replace("/login");
-      return;
-    }
-    apiFetch<MeResponse>("/auth/me", { auth: true })
-      .then((data) => {
-        // New owners without a business go through onboarding first.
-        if (!data.tenantId) {
-          router.replace("/onboarding");
-          return;
-        }
-        setMe(data);
-      })
-      .catch((err) => {
-        if (err instanceof ApiError && err.status === 401) {
-          clearTokens();
-          router.replace("/login");
-        } else {
-          setError(err instanceof ApiError ? err.message : "Failed to load your account.");
-        }
-      });
-  }, [router]);
+export default function DashboardHome() {
+  const { selected, currency, loading: outletLoading } = useOutlet();
+  const { data, error, loading } = useApi<Order[]>(
+    selected ? `/orders?outletId=${selected.id}` : null,
+    { pollMs: 15000 },
+  );
 
-  function logout() {
-    clearTokens();
-    router.replace("/login");
-  }
+  const orders = data ?? [];
+  const todays = orders.filter((o) => isToday(o.createdAt));
+  const live = orders.filter((o) => LIVE_STATUSES.includes(o.status as (typeof LIVE_STATUSES)[number]));
+  const completedToday = todays.filter((o) => o.status === "completed");
+  const revenueToday = completedToday.reduce((sum, o) => sum + Number(o.total), 0);
 
   return (
-    <div className="min-h-screen bg-bg">
-      <header className="border-b border-border bg-surface">
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-4">
-          <span className="text-lg font-semibold text-text">Dashboard</span>
-          <Button variant="secondary" size="sm" onClick={logout}>
-            <LogOut className="h-4 w-4" />
-            Log out
-          </Button>
+    <>
+      <PageHeader
+        title="Dashboard"
+        subtitle={selected ? `${selected.name}${selected.city ? ` · ${selected.city}` : ""}` : undefined}
+      />
+
+      <StateBlock
+        loading={outletLoading || (loading && !data)}
+        error={error}
+        empty={!selected}
+        emptyText="No outlet found. Finish onboarding to add one."
+      >
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <Stat label="Orders today" value={String(todays.length)} icon={ReceiptText} />
+          <Stat label="Live orders" value={String(live.length)} icon={Clock} />
+          <Stat label="Completed today" value={String(completedToday.length)} icon={CheckCircle2} />
+          <Stat label="Revenue today" value={money(revenueToday, currency)} icon={IndianRupee} />
         </div>
-      </header>
 
-      <main className="mx-auto max-w-5xl px-4 py-10">
-        {error && (
-          <div className="rounded-md border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">
-            {error}
+        <div className="mt-8">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-text">Live orders</h2>
+            <Link
+              href="/dashboard/orders"
+              className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
+            >
+              View all <ArrowRight className="h-4 w-4" />
+            </Link>
           </div>
-        )}
 
-        {!error && !me && <p className="text-muted">Loading…</p>}
-
-        {me && (
-          <div className="rounded-xl border border-border bg-surface p-8">
-            <h1 className="text-2xl font-bold text-text">You&apos;re signed in 🎉</h1>
-            <p className="mt-1 text-muted">
-              This is a placeholder. The full owner dashboard is coming next.
-            </p>
-
-            <dl className="mt-6 grid gap-4 sm:grid-cols-2">
-              <div>
-                <dt className="text-sm text-muted">Email</dt>
-                <dd className="text-sm font-medium text-text">{me.email || "—"}</dd>
-              </div>
-              <div>
-                <dt className="text-sm text-muted">Role</dt>
-                <dd className="mt-0.5">
-                  <Badge variant="primary">{me.role}</Badge>
-                </dd>
-              </div>
-              <div>
-                <dt className="text-sm text-muted">Business set up</dt>
-                <dd className="text-sm font-medium text-text">
-                  {me.tenantId ? "Yes" : "Not yet — onboarding is the next step"}
-                </dd>
-              </div>
-            </dl>
-          </div>
-        )}
-      </main>
-    </div>
+          {live.length === 0 ? (
+            <Card className="py-12 text-center text-sm text-muted">
+              No active orders right now.
+            </Card>
+          ) : (
+            <Card className="divide-y divide-border p-0">
+              {live.map((o) => (
+                <Link
+                  key={o.id}
+                  href={`/dashboard/orders/${o.id}`}
+                  className="flex items-center justify-between gap-4 px-5 py-3 hover:bg-surface-muted"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate font-medium text-text">
+                      {o.table?.name ? `Table ${o.table.name}` : humanize(o.type)} · #{o.id.slice(0, 6)}
+                    </p>
+                    <p className="text-xs text-muted">
+                      {o.items.length} item{o.items.length === 1 ? "" : "s"} · {timeAgo(o.createdAt)}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="font-medium text-text">{money(o.total, currency)}</span>
+                    <Badge variant={orderStatusVariant(o.status)}>{humanize(o.status)}</Badge>
+                  </div>
+                </Link>
+              ))}
+            </Card>
+          )}
+        </div>
+      </StateBlock>
+    </>
   );
 }
