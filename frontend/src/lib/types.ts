@@ -110,3 +110,34 @@ export interface PaymentSummary {
   fullyPaid: boolean;
   payments: Payment[];
 }
+
+export interface Staff {
+  id: string;
+  fullName: string;
+  username: string | null;
+  email: string | null;
+  phone: string | null;
+  role: string;
+  outletId: string | null;
+  isActive: boolean;
+  posPin: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface RegisterShift {
+  id: string;
+  outletId: string;
+  openedById: string | null;
+  openingCash: string;
+  closingCash: string | null;
+  openedAt: string;
+  closedAt: string | null;
+}
+
+export interface ShiftReconciliation {
+  openingCash: number;
+  expectedCash: number;
+  countedCash: number;
+  difference: number;
+}
