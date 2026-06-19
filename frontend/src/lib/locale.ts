@@ -1,9 +1,10 @@
 /**
  * Locale data helpers (countries, dial codes, currencies, timezones).
- * Country dataset from `countries-list`; currency/region names and timezones
- * come from the built-in Intl APIs, so we avoid bundling extra data.
+ * Country dataset from `countries-list`; timezone↔country mapping from
+ * `countries-and-timezones`; currency display names from the built-in Intl API.
  */
 import { countries } from "countries-list";
+import { getAllTimezones } from "countries-and-timezones";
 
 export interface CountryOption {
   code: string; // ISO2, e.g. "US"
@@ -61,12 +62,27 @@ export const PHONE_OPTIONS: Option[] = COUNTRIES.map((c) => ({
   keywords: `${c.name} ${c.dialCode} ${c.code}`.toLowerCase(),
 }));
 
-/** Currency options derived per country: flag + country + currency code/name. */
-export const CURRENCY_OPTIONS: Option[] = COUNTRIES.filter((c) => c.currency).map((c) => ({
-  value: c.currency,
-  label: `${c.flag} ${c.name} — ${c.currency} (${currencyName(c.currency)})`,
-  keywords: `${c.name} ${c.currency} ${currencyName(c.currency)}`.toLowerCase(),
-}));
+/** Currency options, deduplicated by currency code.
+ * Searchable by currency code, currency name, and every country that uses it. */
+export const CURRENCY_OPTIONS: Option[] = (() => {
+  const byCurrency = new Map<string, string[]>();
+  for (const c of COUNTRIES) {
+    if (!c.currency) continue;
+    const list = byCurrency.get(c.currency) ?? [];
+    list.push(c.name);
+    byCurrency.set(c.currency, list);
+  }
+  return Array.from(byCurrency.entries())
+    .map(([code, countryNames]) => {
+      const name = currencyName(code);
+      return {
+        value: code,
+        label: `${code} — ${name}`,
+        keywords: `${code} ${name} ${countryNames.join(" ")}`.toLowerCase(),
+      };
+    })
+    .sort((a, b) => a.value.localeCompare(b.value));
+})();
 
 /** Country options: flag + name. */
 export const COUNTRY_OPTIONS: Option[] = COUNTRIES.map((c) => ({
@@ -75,17 +91,33 @@ export const COUNTRY_OPTIONS: Option[] = COUNTRIES.map((c) => ({
   keywords: `${c.name} ${c.code}`.toLowerCase(),
 }));
 
-/** All IANA timezones from the runtime (fallback to a small set). */
+/** ISO2 -> readable country name, from the same dataset used everywhere else. */
+const COUNTRY_NAME_BY_CODE = new Map(COUNTRIES.map((c) => [c.code, c.name]));
+
+/**
+ * Timezone options from `countries-and-timezones`. Aliases are dropped to keep
+ * the list clean. Each zone is labelled and made searchable by the countries
+ * that use it, so searching "india" surfaces "Asia/Kolkata".
+ */
 export function getTimezoneOptions(): Option[] {
-  const intl = Intl as unknown as { supportedValuesOf?: (key: string) => string[] };
-  let zones: string[];
-  try {
-    zones = intl.supportedValuesOf ? intl.supportedValuesOf("timeZone") : ["UTC"];
-  } catch {
-    zones = ["UTC"];
-  }
-  if (!zones.includes("UTC")) zones = ["UTC", ...zones];
-  return zones.map((z) => ({ value: z, label: z, keywords: z.toLowerCase().replace(/_/g, " ") }));
+  const zones = Object.values(getAllTimezones());
+  return zones
+    .filter((z) => !z.aliasOf)
+    .map((z) => {
+      const countryNames = z.countries
+        .map((code) => COUNTRY_NAME_BY_CODE.get(code) ?? code)
+        .filter(Boolean);
+      const place = z.name.split("/").slice(1).join(" / ").replace(/_/g, " ");
+      const countryLabel = countryNames.length ? ` — ${countryNames.join(", ")}` : "";
+      return {
+        value: z.name,
+        label: `(GMT${z.utcOffsetStr}) ${place || z.name}${countryLabel}`,
+        keywords: `${z.name} ${countryNames.join(" ")} ${z.utcOffsetStr}`
+          .toLowerCase()
+          .replace(/_/g, " "),
+      };
+    })
+    .sort((a, b) => a.label.localeCompare(b.label));
 }
 
 export function dialCodeFor(countryCode: string): string {

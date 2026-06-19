@@ -138,6 +138,9 @@ importers:
       clsx:
         specifier: ^2.1.1
         version: 2.1.1
+      countries-and-timezones:
+        specifier: ^3.9.0
+        version: 3.9.0
       countries-list:
         specifier: ^3.1.1
         version: 3.3.0
@@ -1883,6 +1886,10 @@ packages:
     peerDependenciesMeta:
       typescript:
         optional: true
+
+  countries-and-timezones@3.9.0:
+    resolution: {integrity: sha512-3upkVtUfZgdp5xOQI/Deg1ye73ae6bygJMO4UvtUi6wLjwcj7cBqx2PzSZ1VL8i5iveBbjhsQp2Judx7kPKivA==}
+    engines: {node: '>=8.x', npm: '>=5.x'}
 
   countries-list@3.3.0:
     resolution: {integrity: sha512-XRUjS+dcZuNh/fg3+mka3bXgcg4TbQZ1gaK5IJqO6qulerBANl1bmrd20P2dgmPkBpP+5FnejiSF1gd7bgAg+g==}
@@ -6331,6 +6338,8 @@ snapshots:
       path-type: 4.0.0
     optionalDependencies:
       typescript: 5.7.2
+
+  countries-and-timezones@3.9.0: {}
 
   countries-list@3.3.0: {}
 

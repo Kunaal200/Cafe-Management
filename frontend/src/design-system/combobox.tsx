@@ -31,7 +31,7 @@ export function Combobox({
   searchPlaceholder = "Search…",
   id,
   invalid,
-  maxResults = 60,
+  maxResults = 1000,
 }: ComboboxProps) {
   const [open, setOpen] = React.useState(false);
   const [query, setQuery] = React.useState("");

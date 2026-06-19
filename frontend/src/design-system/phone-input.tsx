@@ -35,10 +35,10 @@ export function PhoneInput({
 
   const filtered = React.useMemo(() => {
     const q = query.trim().toLowerCase();
-    const list = q
-      ? COUNTRIES.filter((c) => `${c.name} ${c.dialCode} ${c.code}`.toLowerCase().includes(q))
-      : COUNTRIES;
-    return list.slice(0, 60);
+    if (!q) return COUNTRIES;
+    return COUNTRIES.filter((c) =>
+      `${c.name} ${c.dialCode} ${c.code}`.toLowerCase().includes(q),
+    );
   }, [query]);
 
   return (

@@ -22,10 +22,15 @@ export function CityAutocomplete({
 }) {
   const [cities, setCities] = React.useState<string[]>([]);
   const [open, setOpen] = React.useState(false);
+  const [loading, setLoading] = React.useState(false);
 
   React.useEffect(() => {
-    if (!country) return;
+    if (!country) {
+      setCities([]);
+      return;
+    }
     let cancelled = false;
+    setLoading(true);
     fetch("https://countriesnow.space/api/v0.1/countries/cities", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -33,22 +38,25 @@ export function CityAutocomplete({
     })
       .then((r) => r.json())
       .then((res: { error: boolean; data?: string[] }) => {
-        if (!cancelled && !res.error && Array.isArray(res.data)) {
-          setCities(res.data);
-        }
+        if (cancelled) return;
+        if (!res.error && Array.isArray(res.data)) setCities(res.data);
       })
       .catch(() => {
         /* silent: fall back to plain input */
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
       });
     return () => {
       cancelled = true;
     };
   }, [country]);
 
-  const matches =
-    value.trim() && cities.length
-      ? cities.filter((c) => c.toLowerCase().includes(value.toLowerCase())).slice(0, 8)
-      : [];
+  const q = value.trim().toLowerCase();
+  // Show matches while typing; on focus with an empty field, show a starter list.
+  const matches = cities.length
+    ? (q ? cities.filter((c) => c.toLowerCase().includes(q)) : cities).slice(0, 8)
+    : [];
 
   return (
     <div className="relative">
@@ -60,7 +68,13 @@ export function CityAutocomplete({
           setOpen(true);
         }}
         onFocus={() => setOpen(true)}
-        placeholder={country ? "Start typing your city" : "Select a country first"}
+        placeholder={
+          !country
+            ? "Select a country first"
+            : loading
+              ? "Loading cities…"
+              : "Start typing your city"
+        }
         autoComplete="off"
         className={cn(
           "h-10 w-full rounded-md border border-border bg-surface px-3 text-sm text-text",
