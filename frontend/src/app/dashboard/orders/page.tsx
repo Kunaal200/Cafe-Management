@@ -97,7 +97,7 @@ export default function OrdersPage() {
                   onClick={() => router.push(`/dashboard/orders/${o.id}`)}
                   className="cursor-pointer hover:bg-surface-muted"
                 >
-                  <td className="px-5 py-3 font-medium text-text">#{o.id.slice(0, 6)}</td>
+                  <td className="px-5 py-3 font-medium text-text">#{o.orderNumber}</td>
                   <td className="px-5 py-3 text-muted">
                     {o.table?.name ? `Table ${o.table.name}` : humanize(o.type)}
                   </td>

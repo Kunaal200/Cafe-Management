@@ -189,6 +189,9 @@ model MenuItem {
   price       Decimal  @db.Decimal(10, 2)
   photoUrl    String?
   isVeg       Boolean?
+  isSpicy     Boolean  @default(false)
+  isSweet     Boolean  @default(false)
+  serves      Int?
   isAvailable Boolean  @default(true)
   taxRuleId   String?
   createdAt   DateTime @default(now())
@@ -259,6 +262,7 @@ model Customer {
 
 model Order {
   id          String      @id @default(uuid())
+  orderNumber Int         @unique @default(autoincrement())
   tenantId    String
   outletId    String
   tableId     String?

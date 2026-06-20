@@ -99,7 +99,7 @@ export default function DashboardHome() {
                 >
                   <div className="min-w-0">
                     <p className="truncate font-medium text-text">
-                      {o.table?.name ? `Table ${o.table.name}` : humanize(o.type)} · #{o.id.slice(0, 6)}
+                      {o.table?.name ? `Table ${o.table.name}` : humanize(o.type)} · #{o.orderNumber}
                     </p>
                     <p className="text-xs text-muted">
                       {o.items.length} item{o.items.length === 1 ? "" : "s"} · {timeAgo(o.createdAt)}

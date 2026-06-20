@@ -44,6 +44,7 @@ export interface Payment {
 
 export interface Order {
   id: string;
+  orderNumber: number;
   outletId: string;
   tableId: string | null;
   type: OrderType;
@@ -74,6 +75,9 @@ export interface MenuItem {
   description: string | null;
   price: string;
   isVeg: boolean | null;
+  isSpicy: boolean;
+  isSweet: boolean;
+  serves: number | null;
   isAvailable: boolean;
 }
 

@@ -164,7 +164,7 @@ export default function OrderWorkspacePage() {
         {order && (
           <>
             <PageHeader
-              title={`Order #${order.id.slice(0, 6)}`}
+              title={`Order #${order.orderNumber}`}
               subtitle={`${order.table?.name ? `Table ${order.table.name} · ` : ""}${humanize(order.type)} · ${dateTime(order.createdAt)}`}
               actions={<Badge variant={orderStatusVariant(order.status)}>{humanize(order.status)}</Badge>}
             />

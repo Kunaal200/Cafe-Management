@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { Plus, Search } from "lucide-react";
 import { useApi } from "@/lib/use-api";
 import { StateBlock } from "@/features/dashboard/ui";
+import { MenuItemBadges } from "@/features/dashboard/menu-badges";
 import { useOutlet } from "@/features/dashboard/outlet-context";
 import type { MenuCategory, MenuItem } from "@/lib/types";
 import { money } from "@/lib/format";
@@ -93,6 +94,7 @@ export function MenuCatalog({
               >
                 <span className="line-clamp-2 text-sm font-medium text-text">{it.name}</span>
                 <span className="text-sm text-muted">{money(it.price, currency)}</span>
+                <MenuItemBadges item={it} className="mt-0.5" />
                 {it.isAvailable ? (
                   <span className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-primary opacity-0 transition-opacity group-hover:opacity-100">
                     <Plus className="h-3 w-3" /> Add

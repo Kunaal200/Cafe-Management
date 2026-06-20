@@ -12,6 +12,7 @@ import { Select } from "@/design-system/select";
 import { Modal } from "@/design-system/modal";
 import { useConfirm } from "@/design-system/confirm-dialog";
 import { useToast } from "@/features/dashboard/toast";
+import { MenuItemBadges } from "@/features/dashboard/menu-badges";
 import { useApi } from "@/lib/use-api";
 import { apiFetch, ApiError } from "@/lib/api";
 import type { MenuCategory, MenuItem } from "@/lib/types";
@@ -23,6 +24,10 @@ interface ItemDraft {
   price: string;
   categoryId: string;
   isAvailable: boolean;
+  isVeg: boolean | null;
+  isSpicy: boolean;
+  isSweet: boolean;
+  serves: string;
 }
 
 export default function MenuPage() {
@@ -83,7 +88,16 @@ export default function MenuPage() {
   function openNewItem() {
     if (cats.length === 0) return;
     setFormError(null);
-    setItemDraft({ name: "", price: "", categoryId: cats[0].id, isAvailable: true });
+    setItemDraft({
+      name: "",
+      price: "",
+      categoryId: cats[0].id,
+      isAvailable: true,
+      isVeg: null,
+      isSpicy: false,
+      isSweet: false,
+      serves: "",
+    });
   }
 
   function openEditItem(it: MenuItem) {
@@ -94,6 +108,10 @@ export default function MenuPage() {
       price: String(it.price),
       categoryId: it.categoryId,
       isAvailable: it.isAvailable,
+      isVeg: it.isVeg,
+      isSpicy: it.isSpicy,
+      isSweet: it.isSweet,
+      serves: it.serves != null ? String(it.serves) : "",
     });
   }
 
@@ -106,17 +124,24 @@ export default function MenuPage() {
     }
     setBusy(true);
     setFormError(null);
+    const serves = itemDraft.serves.trim() ? Number(itemDraft.serves) : undefined;
+    const attrs = {
+      isVeg: itemDraft.isVeg ?? undefined,
+      isSpicy: itemDraft.isSpicy,
+      isSweet: itemDraft.isSweet,
+      serves,
+    };
     try {
       if (itemDraft.id) {
         await apiFetch(`/menu/items/${itemDraft.id}`, {
           method: "PATCH",
-          body: { name: itemDraft.name.trim(), price, categoryId: itemDraft.categoryId },
+          body: { name: itemDraft.name.trim(), price, categoryId: itemDraft.categoryId, ...attrs },
           auth: true,
         });
       } else {
         await apiFetch("/menu/items", {
           method: "POST",
-          body: { name: itemDraft.name.trim(), price, categoryId: itemDraft.categoryId },
+          body: { name: itemDraft.name.trim(), price, categoryId: itemDraft.categoryId, ...attrs },
           auth: true,
         });
       }
@@ -209,6 +234,7 @@ export default function MenuPage() {
                         <div className="min-w-0">
                           <p className="truncate font-medium text-text">{it.name}</p>
                           <p className="text-sm text-muted">{money(it.price, currency)}</p>
+                          <MenuItemBadges item={it} className="mt-1" />
                         </div>
                         <div className="flex items-center gap-2">
                           <button type="button" onClick={() => toggleAvailability(it)}>
@@ -305,6 +331,57 @@ export default function MenuPage() {
                   ))}
                 </Select>
               </Field>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <Field label="Diet" htmlFor="itemDiet">
+                <Select
+                  id="itemDiet"
+                  value={itemDraft.isVeg === null ? "" : itemDraft.isVeg ? "veg" : "nonveg"}
+                  onChange={(e) =>
+                    setItemDraft({
+                      ...itemDraft,
+                      isVeg: e.target.value === "" ? null : e.target.value === "veg",
+                    })
+                  }
+                >
+                  <option value="">Not specified</option>
+                  <option value="veg">Vegetarian</option>
+                  <option value="nonveg">Non-vegetarian</option>
+                </Select>
+              </Field>
+              <Field label="Serves (optional)" htmlFor="itemServes">
+                <Input
+                  id="itemServes"
+                  type="number"
+                  min="1"
+                  max="50"
+                  value={itemDraft.serves}
+                  onChange={(e) => setItemDraft({ ...itemDraft, serves: e.target.value })}
+                  placeholder="e.g. 2"
+                />
+              </Field>
+            </div>
+
+            <div className="flex gap-4">
+              <label className="flex items-center gap-2 text-sm text-text">
+                <input
+                  type="checkbox"
+                  checked={itemDraft.isSpicy}
+                  onChange={(e) => setItemDraft({ ...itemDraft, isSpicy: e.target.checked })}
+                  className="h-4 w-4 rounded border-border"
+                />
+                Spicy
+              </label>
+              <label className="flex items-center gap-2 text-sm text-text">
+                <input
+                  type="checkbox"
+                  checked={itemDraft.isSweet}
+                  onChange={(e) => setItemDraft({ ...itemDraft, isSweet: e.target.checked })}
+                  className="h-4 w-4 rounded border-border"
+                />
+                Sweet
+              </label>
             </div>
             <div className="flex justify-end gap-2">
               <Button variant="ghost" onClick={() => setItemDraft(null)}>
