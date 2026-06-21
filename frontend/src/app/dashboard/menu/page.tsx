@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Plus, Pencil, Trash2, FolderPlus } from "lucide-react";
+import { Plus, Pencil, Trash2, FolderPlus, Sparkles } from "lucide-react";
 import { useOutlet } from "@/features/dashboard/outlet-context";
 import { PageHeader, Card, StateBlock } from "@/features/dashboard/ui";
 import { Button } from "@/design-system/button";
@@ -13,6 +13,7 @@ import { Modal } from "@/design-system/modal";
 import { useConfirm } from "@/design-system/confirm-dialog";
 import { useToast } from "@/features/dashboard/toast";
 import { MenuItemBadges } from "@/features/dashboard/menu-badges";
+import { CategoryPresetPicker, type CategoryPreset } from "@/features/dashboard/menu-presets";
 import { useApi } from "@/lib/use-api";
 import { apiFetch, ApiError } from "@/lib/api";
 import type { MenuCategory, MenuItem } from "@/lib/types";
@@ -45,6 +46,8 @@ export default function MenuPage() {
   const [catDraft, setCatDraft] = useState<CatDraft | null>(null);
   const [catName, setCatName] = useState("");
   const [itemDraft, setItemDraft] = useState<ItemDraft | null>(null);
+  const [presetOpen, setPresetOpen] = useState(false);
+  const [presetBusy, setPresetBusy] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -114,6 +117,37 @@ export default function MenuPage() {
       setFormError(err instanceof ApiError ? err.message : "Could not create category.");
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function addPresets(presets: CategoryPreset[]) {
+    setPresetBusy(true);
+    const existing = new Set(topCats.map((c) => c.name.toLowerCase()));
+    let created = 0;
+    try {
+      for (const preset of presets) {
+        if (existing.has(preset.name.toLowerCase())) continue;
+        const category = await apiFetch<MenuCategory>("/menu/categories", {
+          method: "POST",
+          body: { name: preset.name },
+          auth: true,
+        });
+        created += 1;
+        for (const sub of preset.subcategories ?? []) {
+          await apiFetch("/menu/categories", {
+            method: "POST",
+            body: { name: sub, parentId: category.id },
+            auth: true,
+          });
+        }
+      }
+      toast.success(created > 0 ? `Added ${created} categor${created === 1 ? "y" : "ies"}` : "Nothing new to add");
+      setPresetOpen(false);
+      categories.refetch();
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Could not add categories.");
+    } finally {
+      setPresetBusy(false);
     }
   }
 
@@ -238,9 +272,14 @@ export default function MenuPage() {
         title="Menu"
         subtitle="Organize items into categories and subcategories."
         actions={
-          <Button onClick={() => openNewCategory()}>
-            <Plus className="h-4 w-4" /> Category
-          </Button>
+          <>
+            <Button variant="secondary" onClick={() => setPresetOpen(true)}>
+              <Sparkles className="h-4 w-4" /> Browse presets
+            </Button>
+            <Button onClick={() => openNewCategory()}>
+              <Plus className="h-4 w-4" /> Category
+            </Button>
+          </>
         }
       />
 
@@ -443,6 +482,14 @@ export default function MenuPage() {
           </div>
         )}
       </Modal>
+
+      <CategoryPresetPicker
+        open={presetOpen}
+        onClose={() => setPresetOpen(false)}
+        existingNames={topCats.map((c) => c.name)}
+        onConfirm={addPresets}
+        busy={presetBusy}
+      />
     </>
   );
 }

@@ -1,11 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, Trash2, FolderOpen, ChevronRight, Tag } from "lucide-react";
+import { Plus, Trash2, FolderOpen, ChevronRight, Tag, Sparkles } from "lucide-react";
 import { Field } from "@/design-system/field";
 import { Input } from "@/design-system/input";
 import { Button } from "@/design-system/button";
 import { Modal } from "@/design-system/modal";
+import { CategoryPresetPicker, type CategoryPreset } from "@/features/dashboard/menu-presets";
 import { apiFetch, ApiError } from "@/lib/api";
 
 interface SeedItem {
@@ -34,6 +35,7 @@ export function MenuStep({
   const [categories, setCategories] = useState<SeedCat[]>([]);
   const [newCategory, setNewCategory] = useState("");
   const [editing, setEditing] = useState<number | null>(null);
+  const [presetOpen, setPresetOpen] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -42,6 +44,21 @@ export function MenuStep({
     if (!name) return;
     setCategories((cs) => [...cs, { name, items: [emptyItem()], subcategories: [] }]);
     setNewCategory("");
+  }
+
+  function addPresets(presets: CategoryPreset[]) {
+    setCategories((cs) => {
+      const existing = new Set(cs.map((c) => c.name.toLowerCase()));
+      const additions = presets
+        .filter((p) => !existing.has(p.name.toLowerCase()))
+        .map<SeedCat>((p) => ({
+          name: p.name,
+          items: [emptyItem()],
+          subcategories: (p.subcategories ?? []).map((s) => ({ name: s, items: [emptyItem()] })),
+        }));
+      return [...cs, ...additions];
+    });
+    setPresetOpen(false);
   }
 
   function removeCategory(i: number) {
@@ -112,6 +129,15 @@ export function MenuStep({
       <p className="text-sm text-muted">
         Add your categories. Tap a category to add items and subcategories.
       </p>
+
+      <Button
+        type="button"
+        variant="secondary"
+        className="w-full"
+        onClick={() => setPresetOpen(true)}
+      >
+        <Sparkles className="h-4 w-4" /> Browse common categories
+      </Button>
 
       {/* Category list */}
       {categories.length > 0 && (
@@ -192,6 +218,13 @@ export function MenuStep({
           />
         )}
       </Modal>
+
+      <CategoryPresetPicker
+        open={presetOpen}
+        onClose={() => setPresetOpen(false)}
+        existingNames={categories.map((c) => c.name)}
+        onConfirm={addPresets}
+      />
     </div>
   );
 }
