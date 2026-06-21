@@ -34,3 +34,20 @@ export const refreshSchema = z.object({
   refreshToken: z.string().min(1),
 });
 export type RefreshInput = z.infer<typeof refreshSchema>;
+
+/** Update the current user's profile. */
+export const updateProfileSchema = z.object({
+  fullName: z.string().min(2, 'Name is required').optional(),
+  phone: z
+    .string()
+    .regex(/^\+?[0-9\s-]+$/, 'Invalid phone number')
+    .optional(),
+});
+export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
+
+/** Change the current user's password (verifies the current one). */
+export const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1, 'Current password required'),
+  newPassword: passwordSchema,
+});
+export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;

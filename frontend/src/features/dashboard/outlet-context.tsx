@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { apiFetch } from "@/lib/api";
 import type { Outlet } from "@/lib/types";
 
@@ -12,6 +12,7 @@ interface OutletContextValue {
   selectOutlet: (id: string) => void;
   currency: string;
   loading: boolean;
+  refresh: () => void;
 }
 
 const OutletContext = createContext<OutletContextValue | null>(null);
@@ -21,26 +22,25 @@ export function OutletProvider({ children }: { children: React.ReactNode }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    let cancelled = false;
-    apiFetch<Outlet[]>("/outlets", { auth: true })
+  const load = useCallback(() => {
+    return apiFetch<Outlet[]>("/outlets", { auth: true })
       .then((list) => {
-        if (cancelled) return;
         setOutlets(list);
-        const stored = typeof window !== "undefined" ? localStorage.getItem(SELECTED_KEY) : null;
-        const initial = list.find((o) => o.id === stored) ?? list[0] ?? null;
-        setSelectedId(initial?.id ?? null);
+        setSelectedId((prev) => {
+          if (prev && list.some((o) => o.id === prev)) return prev;
+          const stored = typeof window !== "undefined" ? localStorage.getItem(SELECTED_KEY) : null;
+          return list.find((o) => o.id === stored)?.id ?? list[0]?.id ?? null;
+        });
       })
       .catch(() => {
         /* surfaced elsewhere; switcher just stays empty */
       })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
+      .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
 
   const value = useMemo<OutletContextValue>(() => {
     const selected = outlets.find((o) => o.id === selectedId) ?? null;
@@ -49,12 +49,13 @@ export function OutletProvider({ children }: { children: React.ReactNode }) {
       selected,
       currency: selected?.currency ?? "USD",
       loading,
+      refresh: load,
       selectOutlet: (id: string) => {
         setSelectedId(id);
         if (typeof window !== "undefined") localStorage.setItem(SELECTED_KEY, id);
       },
     };
-  }, [outlets, selectedId, loading]);
+  }, [outlets, selectedId, loading, load]);
 
   return <OutletContext.Provider value={value}>{children}</OutletContext.Provider>;
 }

@@ -33,6 +33,21 @@ export const outletSchema = z.object({
 });
 export type OutletInput = z.infer<typeof outletSchema>;
 
+/** Update an existing outlet's details (settings page). */
+export const updateOutletSchema = z.object({
+  name: z.string().min(2, 'Outlet name is required').optional(),
+  addressLine: z.string().nullable().optional(),
+  city: z.string().nullable().optional(),
+  state: z.string().nullable().optional(),
+  postalCode: z.string().nullable().optional(),
+  phone: z.string().nullable().optional(),
+  email: z.string().email().nullable().optional(),
+  currency: z.string().length(3, 'Use 3-letter currency code').optional(),
+  timezone: z.string().min(1).optional(),
+  seatingCapacity: z.number().int().nonnegative().nullable().optional(),
+});
+export type UpdateOutletInput = z.infer<typeof updateOutletSchema>;
+
 /** Step 4 — Localization & tax. */
 export const localizationSchema = z.object({
   currency: z.string().length(3, 'Use 3-letter currency code'),

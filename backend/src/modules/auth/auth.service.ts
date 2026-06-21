@@ -151,6 +151,43 @@ export class AuthService {
     return this.issueTokens(user.id, user.tenantId, user.role, user.email);
   }
 
+  /** Update the current user's profile (name / phone). */
+  async updateProfile(userId: string, input: { fullName?: string; phone?: string }) {
+    const user = await this.prisma.user.update({
+      where: { id: userId },
+      data: { fullName: input.fullName, phone: input.phone },
+      select: { id: true, fullName: true, email: true, phone: true, role: true },
+    });
+    return user;
+  }
+
+  /** The current user's editable profile fields. */
+  async getProfile(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, fullName: true, email: true, phone: true, role: true },
+    });
+    if (!user) {
+      throw new UnauthorizedException('Account not found');
+    }
+    return user;
+  }
+
+  /** Change the current user's password after verifying the current one. */
+  async changePassword(userId: string, currentPassword: string, newPassword: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      throw new UnauthorizedException('Account not found');
+    }
+    const valid = await argon2.verify(user.passwordHash, currentPassword);
+    if (!valid) {
+      throw new UnauthorizedException('Current password is incorrect');
+    }
+    const passwordHash = await argon2.hash(newPassword);
+    await this.prisma.user.update({ where: { id: userId }, data: { passwordHash } });
+    return { changed: true };
+  }
+
   private async issueTokens(
     userId: string,
     tenantId: string | null,

@@ -1,64 +1,230 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useOutlet } from "@/features/dashboard/outlet-context";
-import { PageHeader, Card, StateBlock } from "@/features/dashboard/ui";
+import { useSession } from "@/features/dashboard/session-context";
+import { useToast } from "@/features/dashboard/toast";
+import { PageHeader, Card } from "@/features/dashboard/ui";
+import { Button } from "@/design-system/button";
 import { Badge } from "@/design-system/badge";
-import { useApi } from "@/lib/use-api";
-import type { MeResponse } from "@/lib/types";
+import { Field } from "@/design-system/field";
+import { Input } from "@/design-system/input";
+import { PasswordInput } from "@/design-system/password-input";
+import { apiFetch, ApiError } from "@/lib/api";
 import { humanize } from "@/lib/format";
 
-function Row({ label, value }: { label: string; value: React.ReactNode }) {
-  return (
-    <div className="flex items-center justify-between gap-4 py-3">
-      <dt className="text-sm text-muted">{label}</dt>
-      <dd className="text-sm font-medium text-text">{value}</dd>
-    </div>
-  );
-}
-
 export default function SettingsPage() {
-  const { data: me, error, loading } = useApi<MeResponse>("/auth/me");
-  const { selected, outlets } = useOutlet();
+  const session = useSession();
+  const { selected, refresh } = useOutlet();
+
+  // Outlet details are editable by owners and managers.
+  const canEditOutlet = ["owner", "manager"].includes(session.role);
 
   return (
     <>
       <PageHeader title="Settings" subtitle="Your account and outlet details." />
 
-      <StateBlock loading={loading && !me} error={error}>
-        <div className="grid gap-6 lg:grid-cols-2">
-          <Card>
-            <h2 className="mb-1 text-sm font-semibold text-text">Account</h2>
-            <p className="mb-2 text-xs text-muted">Profile editing is coming soon.</p>
-            <dl className="divide-y divide-border">
-              <Row label="Email" value={me?.email || "—"} />
-              <Row label="Role" value={me ? <Badge variant="primary">{humanize(me.role)}</Badge> : "—"} />
-            </dl>
-          </Card>
-
-          <Card>
-            <h2 className="mb-1 text-sm font-semibold text-text">Current outlet</h2>
-            <p className="mb-2 text-xs text-muted">{outlets.length} outlet{outlets.length === 1 ? "" : "s"} total.</p>
-            {selected ? (
-              <dl className="divide-y divide-border">
-                <Row label="Name" value={selected.name} />
-                <Row label="City" value={selected.city || "—"} />
-                <Row label="Currency" value={selected.currency} />
-                <Row label="Timezone" value={selected.timezone} />
-                <Row
-                  label="Service types"
-                  value={
-                    selected.serviceTypes.length
-                      ? selected.serviceTypes.map(humanize).join(", ")
-                      : "—"
-                  }
-                />
-              </dl>
-            ) : (
-              <p className="text-sm text-muted">No outlet selected.</p>
-            )}
-          </Card>
-        </div>
-      </StateBlock>
+      <div className="grid gap-6 lg:grid-cols-2">
+        <ProfileCard email={session.email} role={session.role} />
+        <PasswordCard />
+        {selected && <OutletCard key={selected.id} editable={canEditOutlet} onSaved={refresh} />}
+      </div>
     </>
+  );
+}
+
+function ProfileCard({ email, role }: { email: string; role: string }) {
+  const toast = useToast();
+  const [fullName, setFullName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [loaded, setLoaded] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    // The session has email/role; fetch the editable profile fields once.
+    apiFetch<{ fullName: string; phone: string | null }>("/auth/profile", { auth: true })
+      .then((p) => {
+        setFullName(p.fullName ?? "");
+        setPhone(p.phone ?? "");
+      })
+      .catch(() => {
+        /* fall back to empty; fields are still editable */
+      })
+      .finally(() => setLoaded(true));
+  }, []);
+
+  async function save() {
+    setBusy(true);
+    try {
+      await apiFetch("/auth/profile", {
+        method: "PATCH",
+        body: { fullName: fullName.trim(), phone: phone.trim() || undefined },
+        auth: true,
+      });
+      toast.success("Profile updated");
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Could not update profile.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Card>
+      <h2 className="mb-4 text-sm font-semibold text-text">Account</h2>
+      <div className="space-y-4">
+        <Field label="Full name" htmlFor="fullName">
+          <Input
+            id="fullName"
+            value={fullName}
+            onChange={(e) => setFullName(e.target.value)}
+            disabled={!loaded}
+          />
+        </Field>
+        <Field label="Phone" htmlFor="phone">
+          <Input id="phone" value={phone} onChange={(e) => setPhone(e.target.value)} disabled={!loaded} />
+        </Field>
+        <div className="flex items-center justify-between">
+          <div className="text-sm text-muted">
+            {email || "—"} · <Badge variant="primary">{humanize(role)}</Badge>
+          </div>
+          <Button onClick={save} disabled={busy || !loaded || !fullName.trim()}>
+            {busy ? "Saving…" : "Save"}
+          </Button>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+function PasswordCard() {
+  const toast = useToast();
+  const [current, setCurrent] = useState("");
+  const [next, setNext] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function change() {
+    setError(null);
+    if (next !== confirm) {
+      setError("New passwords do not match.");
+      return;
+    }
+    setBusy(true);
+    try {
+      await apiFetch("/auth/change-password", {
+        method: "POST",
+        body: { currentPassword: current, newPassword: next },
+        auth: true,
+      });
+      toast.success("Password changed");
+      setCurrent("");
+      setNext("");
+      setConfirm("");
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Could not change password.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Card>
+      <h2 className="mb-4 text-sm font-semibold text-text">Password</h2>
+      <div className="space-y-4">
+        {error && <p className="text-sm text-danger">{error}</p>}
+        <Field label="Current password" htmlFor="current">
+          <PasswordInput id="current" value={current} onChange={(e) => setCurrent(e.target.value)} />
+        </Field>
+        <Field label="New password" htmlFor="next">
+          <PasswordInput id="next" value={next} onChange={(e) => setNext(e.target.value)} placeholder="At least 8 characters" />
+        </Field>
+        <Field label="Confirm new password" htmlFor="confirm">
+          <PasswordInput id="confirm" value={confirm} onChange={(e) => setConfirm(e.target.value)} />
+        </Field>
+        <div className="flex justify-end">
+          <Button onClick={change} disabled={busy || !current || !next || !confirm}>
+            {busy ? "Changing…" : "Change password"}
+          </Button>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+function OutletCard({ editable, onSaved }: { editable: boolean; onSaved: () => void }) {
+  const { selected } = useOutlet();
+  const toast = useToast();
+  const [name, setName] = useState(selected?.name ?? "");
+  const [city, setCity] = useState(selected?.city ?? "");
+  const [currency, setCurrency] = useState(selected?.currency ?? "");
+  const [timezone, setTimezone] = useState(selected?.timezone ?? "");
+  const [busy, setBusy] = useState(false);
+
+  if (!selected) return null;
+
+  async function save() {
+    setBusy(true);
+    try {
+      await apiFetch(`/outlets/${selected!.id}`, {
+        method: "PATCH",
+        body: {
+          name: name.trim(),
+          city: city.trim() || null,
+          currency: currency.trim().toUpperCase(),
+          timezone: timezone.trim(),
+        },
+        auth: true,
+      });
+      toast.success("Outlet updated");
+      onSaved();
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Could not update outlet.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Card>
+      <h2 className="mb-4 text-sm font-semibold text-text">Outlet</h2>
+      <div className="space-y-4">
+        <Field label="Name" htmlFor="outletName">
+          <Input id="outletName" value={name} onChange={(e) => setName(e.target.value)} disabled={!editable} />
+        </Field>
+        <Field label="City" htmlFor="outletCity">
+          <Input id="outletCity" value={city} onChange={(e) => setCity(e.target.value)} disabled={!editable} />
+        </Field>
+        <div className="grid grid-cols-2 gap-4">
+          <Field label="Currency" htmlFor="outletCurrency">
+            <Input
+              id="outletCurrency"
+              value={currency}
+              onChange={(e) => setCurrency(e.target.value)}
+              maxLength={3}
+              disabled={!editable}
+            />
+          </Field>
+          <Field label="Timezone" htmlFor="outletTimezone">
+            <Input
+              id="outletTimezone"
+              value={timezone}
+              onChange={(e) => setTimezone(e.target.value)}
+              disabled={!editable}
+            />
+          </Field>
+        </div>
+        {editable ? (
+          <div className="flex justify-end">
+            <Button onClick={save} disabled={busy || !name.trim()}>
+              {busy ? "Saving…" : "Save"}
+            </Button>
+          </div>
+        ) : (
+          <p className="text-xs text-muted">Only owners and managers can edit outlet details.</p>
+        )}
+      </div>
+    </Card>
   );
 }

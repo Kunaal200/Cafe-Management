@@ -23,16 +23,18 @@ import {
 import { cn } from "@/lib/utils";
 import { clearTokens } from "@/lib/auth";
 import { useOutlet } from "./outlet-context";
+import { useSession } from "./session-context";
 
+// Each item lists the roles allowed to see it; undefined = everyone.
 const NAV = [
   { href: "/dashboard", label: "Home", icon: LayoutDashboard, exact: true },
-  { href: "/dashboard/orders", label: "Orders", icon: ReceiptText },
-  { href: "/dashboard/menu", label: "Menu", icon: UtensilsCrossed },
-  { href: "/dashboard/tables", label: "Tables", icon: Grid3x3 },
-  { href: "/dashboard/register", label: "Register", icon: Calculator },
-  { href: "/dashboard/staff", label: "Staff", icon: Users },
-  { href: "/dashboard/reports", label: "Reports", icon: BarChart3 },
-  { href: "/dashboard/subscription", label: "Subscription", icon: CreditCard },
+  { href: "/dashboard/orders", label: "Orders", icon: ReceiptText, roles: ["owner", "manager", "cashier", "waiter", "kitchen"] },
+  { href: "/dashboard/menu", label: "Menu", icon: UtensilsCrossed, roles: ["owner", "manager"] },
+  { href: "/dashboard/tables", label: "Tables", icon: Grid3x3, roles: ["owner", "manager", "cashier", "waiter"] },
+  { href: "/dashboard/register", label: "Register", icon: Calculator, roles: ["owner", "manager", "cashier"] },
+  { href: "/dashboard/staff", label: "Staff", icon: Users, roles: ["owner", "manager"] },
+  { href: "/dashboard/reports", label: "Reports", icon: BarChart3, roles: ["owner", "manager"] },
+  { href: "/dashboard/subscription", label: "Subscription", icon: CreditCard, roles: ["owner"] },
   { href: "/dashboard/settings", label: "Settings", icon: Settings },
 ];
 
@@ -84,7 +86,10 @@ function OutletSwitcher() {
 export function DashboardShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
+  const session = useSession();
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  const navItems = NAV.filter((item) => !item.roles || item.roles.includes(session.role));
 
   function logout() {
     clearTokens();
@@ -104,7 +109,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         BrewDesk
       </div>
       <ul className="flex-1 space-y-1 px-3 py-2">
-        {NAV.map((item) => {
+        {navItems.map((item) => {
           const Icon = item.icon;
           const active = isActive(item);
           return (
