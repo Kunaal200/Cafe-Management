@@ -144,7 +144,8 @@ export class OnboardingService {
     return { taxRule, outlet: updatedOutlet };
   }
 
-  /** Step 5 — seed the menu: create categories with their items, linking the tenant's tax rule if any. */
+  /** Step 5 — seed the menu: create categories with their items and optional
+   * one-level subcategories, linking the tenant's tax rule if any. */
   async seedMenu(input: MenuSeedInput) {
     const tenantId = getTenantIdOrThrow();
     const taxRule = await this.prisma.taxRule.findFirst({
@@ -152,25 +153,43 @@ export class OnboardingService {
       orderBy: { createdAt: 'asc' },
     });
 
+    const createItems = (categoryId: string, items: { name: string; price: number; isVeg?: boolean }[]) =>
+      items.length > 0
+        ? this.prisma.menuItem.createMany({
+            data: items.map((item) => ({
+              tenantId,
+              categoryId,
+              name: item.name,
+              price: item.price,
+              isVeg: item.isVeg,
+              taxRuleId: taxRule?.id,
+            })),
+          })
+        : Promise.resolve(null);
+
     const created = [];
     for (let i = 0; i < input.categories.length; i += 1) {
       const cat = input.categories[i];
       const category = await this.prisma.menuCategory.create({
         data: { tenantId, name: cat.name, sortOrder: i },
       });
-      if (cat.items.length > 0) {
-        await this.prisma.menuItem.createMany({
-          data: cat.items.map((item) => ({
-            tenantId,
-            categoryId: category.id,
-            name: item.name,
-            price: item.price,
-            isVeg: item.isVeg,
-            taxRuleId: taxRule?.id,
-          })),
+      await createItems(category.id, cat.items);
+
+      const subcategories = cat.subcategories ?? [];
+      for (let j = 0; j < subcategories.length; j += 1) {
+        const sub = subcategories[j];
+        const subcategory = await this.prisma.menuCategory.create({
+          data: { tenantId, parentId: category.id, name: sub.name, sortOrder: j },
         });
+        await createItems(subcategory.id, sub.items);
       }
-      created.push({ categoryId: category.id, name: category.name, items: cat.items.length });
+
+      created.push({
+        categoryId: category.id,
+        name: category.name,
+        items: cat.items.length,
+        subcategories: subcategories.length,
+      });
     }
 
     return { categories: created };

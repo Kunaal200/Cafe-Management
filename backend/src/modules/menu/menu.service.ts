@@ -14,11 +14,24 @@ export class MenuService {
 
   // ---- Categories ----
 
-  createCategory(input: CreateMenuCategoryInput) {
+  async createCategory(input: CreateMenuCategoryInput) {
     const tenantId = getTenantIdOrThrow();
+    if (input.parentId) {
+      // A subcategory must nest under a tenant-owned, top-level category.
+      const parent = await this.prisma.menuCategory.findFirst({
+        where: { id: input.parentId, tenantId },
+      });
+      if (!parent) {
+        throw new NotFoundException('Parent category not found');
+      }
+      if (parent.parentId) {
+        throw new BadRequestException('Categories can only nest one level deep');
+      }
+    }
     return this.prisma.menuCategory.create({
       data: {
         tenantId,
+        parentId: input.parentId,
         name: input.name,
         sortOrder: input.sortOrder ?? 0,
         isActive: input.isActive ?? true,

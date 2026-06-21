@@ -63,6 +63,7 @@ export interface Order {
 
 export interface MenuCategory {
   id: string;
+  parentId: string | null;
   name: string;
   sortOrder: number;
   isActive: boolean;

@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { Plus, Pencil, Trash2 } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Plus, Pencil, Trash2, FolderPlus } from "lucide-react";
 import { useOutlet } from "@/features/dashboard/outlet-context";
 import { PageHeader, Card, StateBlock } from "@/features/dashboard/ui";
 import { Button } from "@/design-system/button";
@@ -30,6 +30,11 @@ interface ItemDraft {
   serves: string;
 }
 
+interface CatDraft {
+  parentId?: string;
+  parentName?: string;
+}
+
 export default function MenuPage() {
   const { currency } = useOutlet();
   const confirm = useConfirm();
@@ -37,29 +42,73 @@ export default function MenuPage() {
   const categories = useApi<MenuCategory[]>("/menu/categories");
   const items = useApi<MenuItem[]>("/menu/items");
 
-  const [catModal, setCatModal] = useState(false);
+  const [catDraft, setCatDraft] = useState<CatDraft | null>(null);
   const [catName, setCatName] = useState("");
   const [itemDraft, setItemDraft] = useState<ItemDraft | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const cats = categories.data ?? [];
+  const allCats = categories.data ?? [];
   const allItems = items.data ?? [];
+
+  const topCats = useMemo(() => allCats.filter((c) => !c.parentId), [allCats]);
+  const subsByParent = useMemo(() => {
+    const map = new Map<string, MenuCategory[]>();
+    for (const c of allCats) {
+      if (c.parentId) {
+        const list = map.get(c.parentId) ?? [];
+        list.push(c);
+        map.set(c.parentId, list);
+      }
+    }
+    return map;
+  }, [allCats]);
+  const itemsByCat = useMemo(() => {
+    const map = new Map<string, MenuItem[]>();
+    for (const it of allItems) {
+      const list = map.get(it.categoryId) ?? [];
+      list.push(it);
+      map.set(it.categoryId, list);
+    }
+    return map;
+  }, [allItems]);
+
+  // Flat, display-ordered list of categories an item can be assigned to.
+  const selectable = useMemo(() => {
+    const out: { id: string; label: string }[] = [];
+    for (const c of topCats) {
+      out.push({ id: c.id, label: c.name });
+      for (const s of subsByParent.get(c.id) ?? []) {
+        out.push({ id: s.id, label: `\u00A0\u00A0└ ${c.name} / ${s.name}` });
+      }
+    }
+    return out;
+  }, [topCats, subsByParent]);
 
   function refetchAll() {
     categories.refetch();
     items.refetch();
   }
 
+  function openNewCategory(parent?: MenuCategory) {
+    setFormError(null);
+    setCatName("");
+    setCatDraft(parent ? { parentId: parent.id, parentName: parent.name } : {});
+  }
+
   async function createCategory() {
-    if (!catName.trim()) return;
+    if (!catName.trim() || !catDraft) return;
     setBusy(true);
     setFormError(null);
     try {
-      await apiFetch("/menu/categories", { method: "POST", body: { name: catName.trim() }, auth: true });
+      await apiFetch("/menu/categories", {
+        method: "POST",
+        body: { name: catName.trim(), parentId: catDraft.parentId },
+        auth: true,
+      });
+      toast.success(catDraft.parentId ? "Subcategory created" : "Category created");
+      setCatDraft(null);
       setCatName("");
-      setCatModal(false);
-      toast.success("Category created");
       categories.refetch();
     } catch (err) {
       setFormError(err instanceof ApiError ? err.message : "Could not create category.");
@@ -68,30 +117,32 @@ export default function MenuPage() {
     }
   }
 
-  async function deleteCategory(id: string) {
+  async function deleteCategory(c: MenuCategory) {
+    const isTop = !c.parentId;
     const ok = await confirm({
-      title: "Delete category?",
-      description: "This also deletes its items. This cannot be undone.",
+      title: isTop ? "Delete category?" : "Delete subcategory?",
+      description: isTop
+        ? "This also deletes its subcategories and all their items. This cannot be undone."
+        : "This also deletes its items. This cannot be undone.",
       confirmLabel: "Delete",
       danger: true,
     });
     if (!ok) return;
     try {
-      await apiFetch(`/menu/categories/${id}`, { method: "DELETE", auth: true });
-      toast.success("Category deleted");
+      await apiFetch(`/menu/categories/${c.id}`, { method: "DELETE", auth: true });
+      toast.success("Deleted");
       refetchAll();
     } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : "Could not delete category.");
+      toast.error(err instanceof ApiError ? err.message : "Could not delete.");
     }
   }
 
-  function openNewItem() {
-    if (cats.length === 0) return;
+  function openNewItem(categoryId: string) {
     setFormError(null);
     setItemDraft({
       name: "",
       price: "",
-      categoryId: cats[0].id,
+      categoryId,
       isAvailable: true,
       isVeg: null,
       isSpicy: false,
@@ -125,7 +176,10 @@ export default function MenuPage() {
     setBusy(true);
     setFormError(null);
     const serves = itemDraft.serves.trim() ? Number(itemDraft.serves) : undefined;
-    const attrs = {
+    const body = {
+      name: itemDraft.name.trim(),
+      price,
+      categoryId: itemDraft.categoryId,
       isVeg: itemDraft.isVeg ?? undefined,
       isSpicy: itemDraft.isSpicy,
       isSweet: itemDraft.isSweet,
@@ -133,20 +187,12 @@ export default function MenuPage() {
     };
     try {
       if (itemDraft.id) {
-        await apiFetch(`/menu/items/${itemDraft.id}`, {
-          method: "PATCH",
-          body: { name: itemDraft.name.trim(), price, categoryId: itemDraft.categoryId, ...attrs },
-          auth: true,
-        });
+        await apiFetch(`/menu/items/${itemDraft.id}`, { method: "PATCH", body, auth: true });
       } else {
-        await apiFetch("/menu/items", {
-          method: "POST",
-          body: { name: itemDraft.name.trim(), price, categoryId: itemDraft.categoryId, ...attrs },
-          auth: true,
-        });
+        await apiFetch("/menu/items", { method: "POST", body, auth: true });
       }
-      setItemDraft(null);
       toast.success(itemDraft.id ? "Item updated" : "Item created");
+      setItemDraft(null);
       items.refetch();
     } catch (err) {
       setFormError(err instanceof ApiError ? err.message : "Could not save item.");
@@ -190,101 +236,103 @@ export default function MenuPage() {
     <>
       <PageHeader
         title="Menu"
-        subtitle="Manage categories and items."
+        subtitle="Organize items into categories and subcategories."
         actions={
-          <>
-            <Button variant="secondary" onClick={() => setCatModal(true)}>
-              <Plus className="h-4 w-4" /> Category
-            </Button>
-            <Button onClick={openNewItem} disabled={cats.length === 0}>
-              <Plus className="h-4 w-4" /> Item
-            </Button>
-          </>
+          <Button onClick={() => openNewCategory()}>
+            <Plus className="h-4 w-4" /> Category
+          </Button>
         }
       />
 
       <StateBlock
         loading={(categories.loading && !categories.data) || (items.loading && !items.data)}
         error={categories.error ?? items.error}
-        empty={cats.length === 0}
+        empty={topCats.length === 0}
         emptyText="No categories yet. Add one to start building your menu."
       >
         <div className="space-y-6">
-          {cats.map((cat) => {
-            const catItems = allItems.filter((i) => i.categoryId === cat.id);
-            return (
-              <Card key={cat.id} className="p-0">
-                <div className="flex items-center justify-between border-b border-border px-5 py-3">
-                  <h2 className="font-semibold text-text">{cat.name}</h2>
+          {topCats.map((cat) => (
+            <Card key={cat.id} className="p-0">
+              <div className="flex items-center justify-between gap-2 border-b border-border px-5 py-3">
+                <h2 className="font-semibold text-text">{cat.name}</h2>
+                <div className="flex items-center gap-1">
+                  <Button variant="ghost" size="sm" onClick={() => openNewItem(cat.id)}>
+                    <Plus className="h-4 w-4" /> Item
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={() => openNewCategory(cat)}>
+                    <FolderPlus className="h-4 w-4" /> Subcategory
+                  </Button>
                   <button
                     type="button"
-                    onClick={() => deleteCategory(cat.id)}
+                    onClick={() => deleteCategory(cat)}
                     className="rounded-md p-1.5 text-muted hover:bg-surface-muted hover:text-danger"
                     aria-label="Delete category"
                   >
                     <Trash2 className="h-4 w-4" />
                   </button>
                 </div>
-                {catItems.length === 0 ? (
-                  <p className="px-5 py-6 text-sm text-muted">No items in this category.</p>
-                ) : (
-                  <ul className="divide-y divide-border">
-                    {catItems.map((it) => (
-                      <li key={it.id} className="flex items-center justify-between gap-4 px-5 py-3">
-                        <div className="min-w-0">
-                          <p className="truncate font-medium text-text">{it.name}</p>
-                          <p className="text-sm text-muted">{money(it.price, currency)}</p>
-                          <MenuItemBadges item={it} className="mt-1" />
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <button type="button" onClick={() => toggleAvailability(it)}>
-                            <Badge variant={it.isAvailable ? "success" : "neutral"}>
-                              {it.isAvailable ? "Available" : "Unavailable"}
-                            </Badge>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => openEditItem(it)}
-                            className="rounded-md p-1.5 text-muted hover:bg-surface-muted hover:text-text"
-                            aria-label="Edit item"
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => deleteItem(it.id)}
-                            className="rounded-md p-1.5 text-muted hover:bg-surface-muted hover:text-danger"
-                            aria-label="Delete item"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </Card>
-            );
-          })}
+              </div>
+
+              <ItemRows
+                items={itemsByCat.get(cat.id) ?? []}
+                currency={currency}
+                onEdit={openEditItem}
+                onToggle={toggleAvailability}
+                onDelete={deleteItem}
+              />
+
+              {(subsByParent.get(cat.id) ?? []).map((sub) => (
+                <div key={sub.id} className="border-t border-border bg-surface-muted/30">
+                  <div className="flex items-center justify-between gap-2 px-5 py-2">
+                    <h3 className="text-sm font-medium text-muted">↳ {sub.name}</h3>
+                    <div className="flex items-center gap-1">
+                      <Button variant="ghost" size="sm" onClick={() => openNewItem(sub.id)}>
+                        <Plus className="h-4 w-4" /> Item
+                      </Button>
+                      <button
+                        type="button"
+                        onClick={() => deleteCategory(sub)}
+                        className="rounded-md p-1.5 text-muted hover:bg-surface-muted hover:text-danger"
+                        aria-label="Delete subcategory"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
+                  <ItemRows
+                    items={itemsByCat.get(sub.id) ?? []}
+                    currency={currency}
+                    onEdit={openEditItem}
+                    onToggle={toggleAvailability}
+                    onDelete={deleteItem}
+                  />
+                </div>
+              ))}
+            </Card>
+          ))}
         </div>
       </StateBlock>
 
-      {/* Category modal */}
-      <Modal open={catModal} onClose={() => setCatModal(false)} title="New category">
+      {/* Category / subcategory modal */}
+      <Modal
+        open={catDraft !== null}
+        onClose={() => setCatDraft(null)}
+        title={catDraft?.parentId ? `New subcategory in ${catDraft.parentName}` : "New category"}
+      >
         {formError && <p className="mb-3 text-sm text-danger">{formError}</p>}
-        <Field label="Category name" htmlFor="catName">
+        <Field label={catDraft?.parentId ? "Subcategory name" : "Category name"} htmlFor="catName">
           <Input
             id="catName"
             value={catName}
             onChange={(e) => setCatName(e.target.value)}
-            placeholder="e.g. Beverages"
+            placeholder={catDraft?.parentId ? "e.g. Hot, Iced" : "e.g. Beverages"}
           />
         </Field>
         <div className="mt-5 flex justify-end gap-2">
-          <Button variant="ghost" onClick={() => setCatModal(false)}>
+          <Button variant="ghost" onClick={() => setCatDraft(null)}>
             Cancel
           </Button>
-          <Button onClick={createCategory} disabled={busy}>
+          <Button onClick={createCategory} disabled={busy || !catName.trim()}>
             {busy ? "Saving…" : "Create"}
           </Button>
         </div>
@@ -324,9 +372,9 @@ export default function MenuPage() {
                   value={itemDraft.categoryId}
                   onChange={(e) => setItemDraft({ ...itemDraft, categoryId: e.target.value })}
                 >
-                  {cats.map((c) => (
+                  {selectable.map((c) => (
                     <option key={c.id} value={c.id}>
-                      {c.name}
+                      {c.label}
                     </option>
                   ))}
                 </Select>
@@ -383,6 +431,7 @@ export default function MenuPage() {
                 Sweet
               </label>
             </div>
+
             <div className="flex justify-end gap-2">
               <Button variant="ghost" onClick={() => setItemDraft(null)}>
                 Cancel
@@ -395,5 +444,60 @@ export default function MenuPage() {
         )}
       </Modal>
     </>
+  );
+}
+
+/** Item rows for a category/subcategory. */
+function ItemRows({
+  items,
+  currency,
+  onEdit,
+  onToggle,
+  onDelete,
+}: {
+  items: MenuItem[];
+  currency: string;
+  onEdit: (it: MenuItem) => void;
+  onToggle: (it: MenuItem) => void;
+  onDelete: (id: string) => void;
+}) {
+  if (items.length === 0) {
+    return <p className="px-5 py-4 text-sm text-muted">No items here yet.</p>;
+  }
+  return (
+    <ul className="divide-y divide-border">
+      {items.map((it) => (
+        <li key={it.id} className="flex items-center justify-between gap-4 px-5 py-3">
+          <div className="min-w-0">
+            <p className="truncate font-medium text-text">{it.name}</p>
+            <p className="text-sm text-muted">{money(it.price, currency)}</p>
+            <MenuItemBadges item={it} className="mt-1" />
+          </div>
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={() => onToggle(it)}>
+              <Badge variant={it.isAvailable ? "success" : "neutral"}>
+                {it.isAvailable ? "Available" : "Unavailable"}
+              </Badge>
+            </button>
+            <button
+              type="button"
+              onClick={() => onEdit(it)}
+              className="rounded-md p-1.5 text-muted hover:bg-surface-muted hover:text-text"
+              aria-label="Edit item"
+            >
+              <Pencil className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => onDelete(it.id)}
+              className="rounded-md p-1.5 text-muted hover:bg-surface-muted hover:text-danger"
+              aria-label="Delete item"
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
+          </div>
+        </li>
+      ))}
+    </ul>
   );
 }

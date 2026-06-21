@@ -3,6 +3,7 @@ import { z } from 'zod';
 /** Menu category create/update. */
 export const createMenuCategorySchema = z.object({
   name: z.string().min(1, 'Category name is required'),
+  parentId: z.string().uuid().optional(),
   sortOrder: z.number().int().nonnegative().optional(),
   isActive: z.boolean().optional(),
 });

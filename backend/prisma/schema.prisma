@@ -167,16 +167,20 @@ model Subscription {
 model MenuCategory {
   id        String   @id @default(uuid())
   tenantId  String
+  parentId  String?
   name      String
   sortOrder Int      @default(0)
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  tenant Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  items  MenuItem[]
+  tenant   Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  parent   MenuCategory?  @relation("CategoryHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
+  children MenuCategory[] @relation("CategoryHierarchy")
+  items    MenuItem[]
 
   @@index([tenantId])
+  @@index([parentId])
   @@map("menu_categories")
 }
 

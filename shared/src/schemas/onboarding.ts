@@ -54,18 +54,25 @@ export const subdomainCheckSchema = z.object({
 });
 export type SubdomainCheckInput = z.infer<typeof subdomainCheckSchema>;
 
-/** Step 5 — Menu seed (template or manual). Categories each carry a list of items. */
+/** Step 5 — Menu seed (template or manual). Categories carry items and optional
+ * one-level subcategories (which also carry items). */
+const menuItemSeedSchema = z.object({
+  name: z.string().min(1, 'Item name is required'),
+  price: z.number().nonnegative('Price cannot be negative'),
+  isVeg: z.boolean().optional(),
+});
+
 export const menuSeedSchema = z.object({
   categories: z
     .array(
       z.object({
         name: z.string().min(1, 'Category name is required'),
-        items: z
+        items: z.array(menuItemSeedSchema).default([]),
+        subcategories: z
           .array(
             z.object({
-              name: z.string().min(1, 'Item name is required'),
-              price: z.number().nonnegative('Price cannot be negative'),
-              isVeg: z.boolean().optional(),
+              name: z.string().min(1, 'Subcategory name is required'),
+              items: z.array(menuItemSeedSchema).default([]),
             }),
           )
           .default([]),
