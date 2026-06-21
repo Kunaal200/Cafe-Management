@@ -10,8 +10,29 @@ import { LocalizationStep } from "./steps/localization-step";
 import { MenuStep } from "./steps/menu-step";
 import { TablesStep } from "./steps/tables-step";
 import { FinishStep } from "./steps/finish-step";
+import { useNavigationGuard } from "./use-navigation-guard";
+import { Modal } from "@/design-system/modal";
+import { Button } from "@/design-system/button";
 import { apiFetch, ApiError } from "@/lib/api";
 import { clearTokens, isAuthenticated } from "@/lib/auth";
+
+const STORAGE_KEY = "cafe.onboarding";
+
+interface PersistedState {
+  step: number;
+  outletId: string | null;
+  country?: string;
+}
+
+function loadPersisted(): PersistedState | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = sessionStorage.getItem(STORAGE_KEY);
+    return raw ? (JSON.parse(raw) as PersistedState) : null;
+  } catch {
+    return null;
+  }
+}
 
 const STEP_LABELS = ["Business", "Outlet", "Tax", "Menu", "Tables", "Done"];
 
@@ -30,6 +51,30 @@ export function OnboardingWizard() {
   const [step, setStep] = useState(0);
   const [outletId, setOutletId] = useState<string | null>(null);
   const [country, setCountry] = useState<string | undefined>(undefined);
+
+  // Restore in-progress state (e.g. after an accidental refresh) before the
+  // first paint so the user lands back on the step they left off.
+  useEffect(() => {
+    const saved = loadPersisted();
+    if (saved) {
+      setStep(saved.step);
+      setOutletId(saved.outletId);
+      setCountry(saved.country);
+    }
+  }, []);
+
+  // Persist progress on every change so it survives a reload within the session.
+  useEffect(() => {
+    if (!ready) return;
+    if (step >= 5) {
+      sessionStorage.removeItem(STORAGE_KEY);
+    } else {
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ step, outletId, country }));
+    }
+  }, [ready, step, outletId, country]);
+
+  // Warn before leaving the flow via Back / refresh / close so progress isn't lost.
+  const guard = useNavigationGuard(ready && step < 5);
 
   // Guard: onboarding is only for an authenticated user who has NOT set up a
   // business yet. Any other case redirects away — the wizard never renders.
@@ -53,6 +98,11 @@ export function OnboardingWizard() {
         router.replace("/login");
       });
   }, [router]);
+
+  function quitOnboarding() {
+    sessionStorage.removeItem(STORAGE_KEY);
+    guard.leave(() => router.replace("/login"));
+  }
 
   if (!ready) {
     return (
@@ -114,6 +164,24 @@ export function OnboardingWizard() {
         )}
         {step === 5 && <FinishStep />}
       </main>
+
+      {/* Confirm before leaving so in-progress setup isn't lost. */}
+      <Modal
+        open={guard.promptOpen}
+        onClose={guard.stay}
+        title="Quit setup?"
+        description="Your progress on this step will be lost. You can finish setting up later, but you'll start this step over."
+        className="max-w-md"
+      >
+        <div className="flex justify-end gap-2">
+          <Button variant="ghost" onClick={guard.stay}>
+            Keep setting up
+          </Button>
+          <Button variant="danger" onClick={quitOnboarding}>
+            Quit
+          </Button>
+        </div>
+      </Modal>
     </div>
   );
 }
