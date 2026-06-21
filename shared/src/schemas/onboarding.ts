@@ -33,7 +33,7 @@ export const outletSchema = z.object({
 });
 export type OutletInput = z.infer<typeof outletSchema>;
 
-/** Update an existing outlet's details (settings page). */
+/** Update an existing outlet's details (settings page + onboarding back-edit). */
 export const updateOutletSchema = z.object({
   name: z.string().min(2, 'Outlet name is required').optional(),
   addressLine: z.string().nullable().optional(),
@@ -42,6 +42,7 @@ export const updateOutletSchema = z.object({
   postalCode: z.string().nullable().optional(),
   phone: z.string().nullable().optional(),
   email: z.string().email().nullable().optional(),
+  serviceTypes: z.array(z.enum(orderTypeValues)).min(1, 'Pick at least one service type').optional(),
   currency: z.string().length(3, 'Use 3-letter currency code').optional(),
   timezone: z.string().min(1).optional(),
   seatingCapacity: z.number().int().nonnegative().nullable().optional(),

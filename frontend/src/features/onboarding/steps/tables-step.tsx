@@ -16,10 +16,12 @@ export function TablesStep({
   outletId,
   onComplete,
   onSkip,
+  onBack,
 }: {
   outletId: string;
   onComplete: () => void;
   onSkip: () => void;
+  onBack: () => void;
 }) {
   const [formError, setFormError] = useState<string | null>(null);
   const {
@@ -64,6 +66,9 @@ export function TablesStep({
       </div>
 
       <div className="flex gap-2">
+        <Button type="button" variant="ghost" onClick={onBack}>
+          Back
+        </Button>
         <Button type="button" variant="ghost" className="flex-1" onClick={onSkip}>
           Skip for now
         </Button>

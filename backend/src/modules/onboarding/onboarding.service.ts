@@ -44,8 +44,33 @@ export class OnboardingService {
     if (!user) {
       throw new NotFoundException('User not found');
     }
+
+    // Editing during onboarding: if the user already has a tenant, update its
+    // business details in place instead of creating a second one.
     if (user.tenantId) {
-      throw new ConflictException('This account already has a business set up');
+      const subdomainOwner = await this.prisma.tenant.findUnique({
+        where: { subdomain: input.subdomain },
+      });
+      if (subdomainOwner && subdomainOwner.id !== user.tenantId) {
+        throw new ConflictException('Subdomain is already taken');
+      }
+      const updated = await this.prisma.tenant.update({
+        where: { id: user.tenantId },
+        data: {
+          name: input.businessName,
+          subdomain: input.subdomain,
+          businessType: input.businessType,
+          country: input.country,
+          logoUrl: input.logoUrl,
+        },
+      });
+      const tokens = await this.auth.issueTokensForUser({
+        id: user.id,
+        tenantId: updated.id,
+        role: user.role,
+        email: user.email ?? '',
+      });
+      return { tenantId: updated.id, tokens };
     }
 
     const subdomainTaken = await this.prisma.tenant.findUnique({
@@ -117,7 +142,8 @@ export class OnboardingService {
     });
   }
 
-  /** Step 4 — set localization/tax: create a tax rule and update the outlet currency/timezone. */
+  /** Step 4 — set localization/tax: upsert the tax rule and update the outlet currency/timezone.
+   * Re-running (e.g. after going back to edit) updates rather than duplicating. */
   async setLocalization(outletId: string, input: LocalizationInput) {
     const tenantId = getTenantIdOrThrow();
     const outlet = await this.prisma.outlet.findFirst({ where: { id: outletId, tenantId } });
@@ -125,16 +151,31 @@ export class OnboardingService {
       throw new NotFoundException('Outlet not found');
     }
 
+    const existingTaxRule = await this.prisma.taxRule.findFirst({
+      where: { tenantId },
+      orderBy: { createdAt: 'asc' },
+    });
+
     const [taxRule, updatedOutlet] = await this.prisma.$transaction([
-      this.prisma.taxRule.create({
-        data: {
-          tenantId,
-          name: input.taxName,
-          rate: input.taxRate,
-          mode: input.taxMode as PrismaTaxMode,
-          regNumber: input.taxRegistrationNumber,
-        },
-      }),
+      existingTaxRule
+        ? this.prisma.taxRule.update({
+            where: { id: existingTaxRule.id },
+            data: {
+              name: input.taxName,
+              rate: input.taxRate,
+              mode: input.taxMode as PrismaTaxMode,
+              regNumber: input.taxRegistrationNumber,
+            },
+          })
+        : this.prisma.taxRule.create({
+            data: {
+              tenantId,
+              name: input.taxName,
+              rate: input.taxRate,
+              mode: input.taxMode as PrismaTaxMode,
+              regNumber: input.taxRegistrationNumber,
+            },
+          }),
       this.prisma.outlet.update({
         where: { id: outletId },
         data: { currency: input.currency, timezone: input.timezone },

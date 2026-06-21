@@ -3,6 +3,11 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Coffee } from "lucide-react";
+import type {
+  BusinessDetailsInput,
+  OutletInput,
+  LocalizationInput,
+} from "@cafe/shared";
 import { Stepper } from "./stepper";
 import { BusinessStep } from "./steps/business-step";
 import { OutletStep } from "./steps/outlet-step";
@@ -22,6 +27,9 @@ interface PersistedState {
   step: number;
   outletId: string | null;
   country?: string;
+  business?: BusinessDetailsInput;
+  outlet?: OutletInput;
+  localization?: LocalizationInput;
 }
 
 function loadPersisted(): PersistedState | null {
@@ -51,6 +59,10 @@ export function OnboardingWizard() {
   const [step, setStep] = useState(0);
   const [outletId, setOutletId] = useState<string | null>(null);
   const [country, setCountry] = useState<string | undefined>(undefined);
+  // Entered values per step, kept so going Back prefills and re-submits update.
+  const [business, setBusiness] = useState<BusinessDetailsInput | undefined>();
+  const [outlet, setOutlet] = useState<OutletInput | undefined>();
+  const [localization, setLocalization] = useState<LocalizationInput | undefined>();
 
   // Restore in-progress state (e.g. after an accidental refresh) before the
   // first paint so the user lands back on the step they left off.
@@ -60,6 +72,9 @@ export function OnboardingWizard() {
       setStep(saved.step);
       setOutletId(saved.outletId);
       setCountry(saved.country);
+      setBusiness(saved.business);
+      setOutlet(saved.outlet);
+      setLocalization(saved.localization);
     }
   }, []);
 
@@ -69,11 +84,14 @@ export function OnboardingWizard() {
     if (step >= 5) {
       sessionStorage.removeItem(STORAGE_KEY);
     } else {
-      sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ step, outletId, country }));
+      sessionStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({ step, outletId, country, business, outlet, localization }),
+      );
     }
-  }, [ready, step, outletId, country]);
+  }, [ready, step, outletId, country, business, outlet, localization]);
 
-  // Warn before leaving the flow via Back / refresh / close so progress isn't lost.
+  // Warn before leaving the flow via Back so progress isn't lost.
   const guard = useNavigationGuard(ready && step < 5);
 
   // Guard: onboarding is only for an authenticated user who has NOT set up a
@@ -140,8 +158,10 @@ export function OnboardingWizard() {
 
         {step === 0 && (
           <BusinessStep
-            onComplete={(c) => {
+            defaults={business}
+            onComplete={(c, values) => {
               setCountry(c);
+              setBusiness(values);
               setStep(1);
             }}
           />
@@ -149,18 +169,37 @@ export function OnboardingWizard() {
         {step === 1 && (
           <OutletStep
             country={country}
-            onComplete={(id) => {
+            outletId={outletId}
+            defaults={outlet}
+            onComplete={(id, values) => {
               setOutletId(id);
+              setOutlet(values);
               setStep(2);
             }}
+            onBack={() => setStep(0)}
           />
         )}
         {step === 2 && outletId && (
-          <LocalizationStep outletId={outletId} onComplete={() => setStep(3)} />
+          <LocalizationStep
+            outletId={outletId}
+            defaults={localization}
+            onComplete={(values) => {
+              setLocalization(values);
+              setStep(3);
+            }}
+            onBack={() => setStep(1)}
+          />
         )}
-        {step === 3 && <MenuStep onComplete={() => setStep(4)} onSkip={() => setStep(4)} />}
+        {step === 3 && (
+          <MenuStep onComplete={() => setStep(4)} onSkip={() => setStep(4)} onBack={() => setStep(2)} />
+        )}
         {step === 4 && outletId && (
-          <TablesStep outletId={outletId} onComplete={() => setStep(5)} onSkip={() => setStep(5)} />
+          <TablesStep
+            outletId={outletId}
+            onComplete={() => setStep(5)}
+            onSkip={() => setStep(5)}
+            onBack={() => setStep(3)}
+          />
         )}
         {step === 5 && <FinishStep />}
       </main>
@@ -169,16 +208,16 @@ export function OnboardingWizard() {
       <Modal
         open={guard.promptOpen}
         onClose={guard.stay}
-        title="Quit setup?"
-        description="Your progress on this step will be lost. You can finish setting up later, but you'll start this step over."
+        title="Exit setup?"
+        description="You can use the Back button to edit earlier steps. If you exit, your saved progress is kept and you can finish later."
         className="max-w-md"
       >
         <div className="flex justify-end gap-2">
           <Button variant="ghost" onClick={guard.stay}>
-            Keep setting up
+            Stay and edit
           </Button>
           <Button variant="danger" onClick={quitOnboarding}>
-            Quit
+            Exit setup
           </Button>
         </div>
       </Modal>

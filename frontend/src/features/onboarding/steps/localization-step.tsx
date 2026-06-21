@@ -16,10 +16,14 @@ const TIMEZONE_OPTIONS = getTimezoneOptions();
 
 export function LocalizationStep({
   outletId,
+  defaults,
   onComplete,
+  onBack,
 }: {
   outletId: string;
-  onComplete: () => void;
+  defaults?: LocalizationInput;
+  onComplete: (values: LocalizationInput) => void;
+  onBack: () => void;
 }) {
   const [formError, setFormError] = useState<string | null>(null);
   const {
@@ -29,7 +33,7 @@ export function LocalizationStep({
     formState: { errors, isSubmitting },
   } = useForm<LocalizationInput>({
     resolver: zodResolver(localizationSchema),
-    defaultValues: { currency: "USD", timezone: "UTC", taxMode: TaxMode.EXCLUSIVE, taxRate: 0 },
+    defaultValues: defaults ?? { currency: "USD", timezone: "UTC", taxMode: TaxMode.EXCLUSIVE, taxRate: 0 },
   });
 
   async function onSubmit(values: LocalizationInput) {
@@ -40,7 +44,7 @@ export function LocalizationStep({
         body: values,
         auth: true,
       });
-      onComplete();
+      onComplete(values);
     } catch (err) {
       setFormError(err instanceof ApiError ? err.message : "Could not save tax settings.");
     }
@@ -117,9 +121,14 @@ export function LocalizationStep({
         <Input id="taxRegistrationNumber" placeholder="Optional (prints on bills)" {...register("taxRegistrationNumber")} />
       </Field>
 
-      <Button type="submit" className="w-full" disabled={isSubmitting}>
-        {isSubmitting ? "Saving…" : "Continue"}
-      </Button>
+      <div className="flex gap-2">
+        <Button type="button" variant="ghost" className="flex-1" onClick={onBack}>
+          Back
+        </Button>
+        <Button type="submit" className="flex-1" disabled={isSubmitting}>
+          {isSubmitting ? "Saving…" : "Continue"}
+        </Button>
+      </div>
     </form>
   );
 }

@@ -26,7 +26,13 @@ const businessTypeOptions: { value: string; label: string }[] = [
   { value: BusinessType.BAKERY, label: "Bakery" },
 ];
 
-export function BusinessStep({ onComplete }: { onComplete: (country: string) => void }) {
+export function BusinessStep({
+  defaults,
+  onComplete,
+}: {
+  defaults?: BusinessDetailsInput;
+  onComplete: (country: string, values: BusinessDetailsInput) => void;
+}) {
   const [formError, setFormError] = useState<string | null>(null);
   const {
     register,
@@ -36,19 +42,25 @@ export function BusinessStep({ onComplete }: { onComplete: (country: string) => 
     formState: { errors, isSubmitting },
   } = useForm<BusinessDetailsInput>({
     resolver: zodResolver(businessDetailsSchema),
-    defaultValues: { businessType: BusinessType.CAFE },
+    defaultValues: defaults ?? { businessType: BusinessType.CAFE },
   });
+
+  const editing = !!defaults;
 
   async function onSubmit(values: BusinessDetailsInput) {
     setFormError(null);
     try {
-      const { available } = await apiFetch<{ available: boolean }>(
-        `/onboarding/check-subdomain?subdomain=${encodeURIComponent(values.subdomain)}`,
-        { auth: true },
-      );
-      if (!available) {
-        setError("subdomain", { message: "That workspace name is taken" });
-        return;
+      // Only check availability for a new workspace name (skip when unchanged
+      // during an edit, since it would report your own name as "taken").
+      if (!editing || values.subdomain !== defaults?.subdomain) {
+        const { available } = await apiFetch<{ available: boolean }>(
+          `/onboarding/check-subdomain?subdomain=${encodeURIComponent(values.subdomain)}`,
+          { auth: true },
+        );
+        if (!available) {
+          setError("subdomain", { message: "That workspace name is taken" });
+          return;
+        }
       }
 
       const res = await apiFetch<{ tenantId: string; tokens: TokenPair }>(
@@ -57,10 +69,9 @@ export function BusinessStep({ onComplete }: { onComplete: (country: string) => 
       );
       // The new token carries the tenant id — required by every later step.
       setTokens(res.tokens);
-      // Pass the readable country name so the outlet step can suggest cities.
-      onComplete(countryName(values.country));
+      onComplete(countryName(values.country), values);
     } catch (err) {
-      setFormError(err instanceof ApiError ? err.message : "Could not create your business.");
+      setFormError(err instanceof ApiError ? err.message : "Could not save your business.");
     }
   }
 
@@ -110,7 +121,7 @@ export function BusinessStep({ onComplete }: { onComplete: (country: string) => 
       </Field>
 
       <Button type="submit" className="w-full" disabled={isSubmitting}>
-        {isSubmitting ? "Creating…" : "Continue"}
+        {isSubmitting ? "Saving…" : editing ? "Save & continue" : "Continue"}
       </Button>
     </form>
   );

@@ -19,10 +19,16 @@ const serviceTypeOptions = [
 
 export function OutletStep({
   country,
+  outletId,
+  defaults,
   onComplete,
+  onBack,
 }: {
   country?: string;
-  onComplete: (outletId: string) => void;
+  outletId?: string | null;
+  defaults?: OutletInput;
+  onComplete: (outletId: string, values: OutletInput) => void;
+  onBack: () => void;
 }) {
   const [formError, setFormError] = useState<string | null>(null);
   const {
@@ -32,20 +38,30 @@ export function OutletStep({
     formState: { errors, isSubmitting },
   } = useForm<OutletInput>({
     resolver: zodResolver(outletSchema),
-    defaultValues: { serviceTypes: [OrderType.DINE_IN], city: "" },
+    defaultValues: defaults ?? { serviceTypes: [OrderType.DINE_IN], city: "" },
   });
 
   async function onSubmit(values: OutletInput) {
     setFormError(null);
     try {
-      const outlet = await apiFetch<{ id: string }>("/onboarding/outlet", {
-        method: "POST",
-        body: values,
-        auth: true,
-      });
-      onComplete(outlet.id);
+      if (outletId) {
+        // Editing an outlet created earlier — update in place, no duplicate.
+        await apiFetch(`/outlets/${outletId}`, {
+          method: "PATCH",
+          body: { name: values.name, city: values.city, serviceTypes: values.serviceTypes },
+          auth: true,
+        });
+        onComplete(outletId, values);
+      } else {
+        const outlet = await apiFetch<{ id: string }>("/onboarding/outlet", {
+          method: "POST",
+          body: values,
+          auth: true,
+        });
+        onComplete(outlet.id, values);
+      }
     } catch (err) {
-      setFormError(err instanceof ApiError ? err.message : "Could not create your outlet.");
+      setFormError(err instanceof ApiError ? err.message : "Could not save your outlet.");
     }
   }
 
@@ -88,9 +104,14 @@ export function OutletStep({
         )}
       </div>
 
-      <Button type="submit" className="w-full" disabled={isSubmitting}>
-        {isSubmitting ? "Saving…" : "Continue"}
-      </Button>
+      <div className="flex gap-2">
+        <Button type="button" variant="ghost" className="flex-1" onClick={onBack}>
+          Back
+        </Button>
+        <Button type="submit" className="flex-1" disabled={isSubmitting}>
+          {isSubmitting ? "Saving…" : "Continue"}
+        </Button>
+      </div>
     </form>
   );
 }

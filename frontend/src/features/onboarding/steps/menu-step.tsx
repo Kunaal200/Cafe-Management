@@ -28,9 +28,11 @@ const emptyItem = (): SeedItem => ({ name: "", price: "" });
 export function MenuStep({
   onComplete,
   onSkip,
+  onBack,
 }: {
   onComplete: () => void;
   onSkip: () => void;
+  onBack: () => void;
 }) {
   const [categories, setCategories] = useState<SeedCat[]>([]);
   const [newCategory, setNewCategory] = useState("");
@@ -195,6 +197,9 @@ export function MenuStep({
       </div>
 
       <div className="flex gap-2 pt-2">
+        <Button type="button" variant="ghost" onClick={onBack}>
+          Back
+        </Button>
         <Button type="button" variant="ghost" className="flex-1" onClick={onSkip}>
           Skip for now
         </Button>

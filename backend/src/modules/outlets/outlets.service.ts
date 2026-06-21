@@ -39,6 +39,7 @@ export class OutletsService {
         postalCode: input.postalCode,
         phone: input.phone,
         email: input.email,
+        serviceTypes: input.serviceTypes,
         currency: input.currency,
         timezone: input.timezone,
         seatingCapacity: input.seatingCapacity,
