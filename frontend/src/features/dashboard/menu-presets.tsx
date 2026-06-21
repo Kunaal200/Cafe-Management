@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Coffee,
   CupSoda,
@@ -38,40 +38,102 @@ export interface CategoryPreset {
   subcategories?: string[];
 }
 
-/** Common café / restaurant menu categories for quick setup. */
-export const CATEGORY_PRESETS: CategoryPreset[] = [
-  { name: "Coffee", icon: Coffee, subcategories: ["Hot", "Iced"] },
-  { name: "Tea", icon: Coffee, subcategories: ["Hot", "Iced"] },
-  { name: "Beverages", icon: CupSoda, subcategories: ["Soft drinks", "Juices"] },
-  { name: "Smoothies & Shakes", icon: GlassWater },
-  { name: "Breakfast", icon: Egg },
-  { name: "Bakery & Pastries", icon: Croissant },
-  { name: "Starters", icon: UtensilsCrossed },
-  { name: "Soups", icon: Soup },
-  { name: "Salads", icon: Salad },
-  { name: "Pizza", icon: Pizza },
-  { name: "Burgers", icon: Beef },
-  { name: "Sandwiches", icon: Sandwich },
-  { name: "Main Course", icon: UtensilsCrossed, subcategories: ["Veg", "Non-veg"] },
-  { name: "Chicken", icon: Drumstick },
-  { name: "Seafood", icon: Fish },
-  { name: "Breads", icon: Wheat },
-  { name: "Rice & Biryani", icon: Wheat },
-  { name: "Desserts", icon: CakeSlice },
-  { name: "Ice Cream", icon: IceCreamCone },
-  { name: "Snacks", icon: Cookie },
-  { name: "Mocktails", icon: Martini },
-  { name: "Cocktails", icon: Martini },
-  { name: "Beer", icon: Beer },
-  { name: "Wine", icon: Wine },
-  { name: "Kids Menu", icon: Candy },
-  { name: "Specials", icon: Star },
+export interface PresetGroup {
+  cuisine: string;
+  presets: CategoryPreset[];
+}
+
+/** Common menu categories grouped by cuisine / outlet type, for quick setup. */
+export const PRESET_GROUPS: PresetGroup[] = [
+  {
+    cuisine: "Café & Bakery",
+    presets: [
+      { name: "Coffee", icon: Coffee, subcategories: ["Hot", "Iced"] },
+      { name: "Tea", icon: Coffee, subcategories: ["Hot", "Iced"] },
+      { name: "Beverages", icon: CupSoda, subcategories: ["Soft drinks", "Juices"] },
+      { name: "Smoothies & Shakes", icon: GlassWater },
+      { name: "Breakfast", icon: Egg },
+      { name: "Bakery & Pastries", icon: Croissant },
+      { name: "Desserts", icon: CakeSlice },
+      { name: "Snacks", icon: Cookie },
+    ],
+  },
+  {
+    cuisine: "Indian",
+    presets: [
+      { name: "Starters", icon: UtensilsCrossed, subcategories: ["Veg", "Non-veg"] },
+      { name: "Tandoori", icon: Drumstick },
+      { name: "Curries", icon: Soup, subcategories: ["Veg", "Non-veg"] },
+      { name: "Biryani & Rice", icon: Wheat },
+      { name: "Breads", icon: Wheat },
+      { name: "South Indian", icon: UtensilsCrossed },
+      { name: "Thali", icon: UtensilsCrossed },
+      { name: "Sweets", icon: Candy },
+    ],
+  },
+  {
+    cuisine: "Italian",
+    presets: [
+      { name: "Antipasti", icon: Salad },
+      { name: "Pizza", icon: Pizza },
+      { name: "Pasta", icon: UtensilsCrossed },
+      { name: "Risotto", icon: Soup },
+      { name: "Salads", icon: Salad },
+      { name: "Dolci", icon: CakeSlice },
+    ],
+  },
+  {
+    cuisine: "Chinese & Asian",
+    presets: [
+      { name: "Dim Sum", icon: UtensilsCrossed },
+      { name: "Soups", icon: Soup },
+      { name: "Noodles", icon: UtensilsCrossed },
+      { name: "Fried Rice", icon: Wheat },
+      { name: "Sushi", icon: Fish },
+      { name: "Stir-fry", icon: Beef },
+    ],
+  },
+  {
+    cuisine: "Fast Food",
+    presets: [
+      { name: "Burgers", icon: Beef },
+      { name: "Sandwiches", icon: Sandwich },
+      { name: "Pizza", icon: Pizza },
+      { name: "Fried Chicken", icon: Drumstick },
+      { name: "Sides", icon: Cookie },
+      { name: "Ice Cream", icon: IceCreamCone },
+      { name: "Combos", icon: UtensilsCrossed },
+    ],
+  },
+  {
+    cuisine: "Bar & Drinks",
+    presets: [
+      { name: "Cocktails", icon: Martini },
+      { name: "Mocktails", icon: Martini },
+      { name: "Beer", icon: Beer },
+      { name: "Wine", icon: Wine },
+      { name: "Spirits", icon: Wine },
+      { name: "Bar Bites", icon: Cookie },
+    ],
+  },
+  {
+    cuisine: "General",
+    presets: [
+      { name: "Main Course", icon: UtensilsCrossed, subcategories: ["Veg", "Non-veg"] },
+      { name: "Seafood", icon: Fish },
+      { name: "Salads", icon: Salad },
+      { name: "Soups", icon: Soup },
+      { name: "Kids Menu", icon: Candy },
+      { name: "Specials", icon: Star },
+    ],
+  },
 ];
 
 /**
- * Multi-select modal of preset categories (icon + name). Categories already
- * present (by lowercased name in `existingNames`) are marked as added and can't
- * be picked again. Calls `onConfirm` with the chosen presets.
+ * Multi-select modal of preset categories grouped by cuisine. Categories already
+ * present (by lowercased name in `existingNames`) are marked as added. Selection
+ * is keyed by category name, so picking the same name under two cuisines dedupes.
+ * Calls `onConfirm` with the chosen presets.
  */
 export function CategoryPresetPicker({
   open,
@@ -86,13 +148,21 @@ export function CategoryPresetPicker({
   onConfirm: (presets: CategoryPreset[]) => void;
   busy?: boolean;
 }) {
+  const [activeCuisine, setActiveCuisine] = useState(PRESET_GROUPS[0].cuisine);
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const existing = new Set(existingNames.map((n) => n.toLowerCase()));
+  const existing = useMemo(
+    () => new Set(existingNames.map((n) => n.toLowerCase())),
+    [existingNames],
+  );
 
-  // Reset selection each time the picker opens.
   useEffect(() => {
-    if (open) setSelected(new Set());
+    if (open) {
+      setSelected(new Set());
+      setActiveCuisine(PRESET_GROUPS[0].cuisine);
+    }
   }, [open]);
+
+  const group = PRESET_GROUPS.find((g) => g.cuisine === activeCuisine) ?? PRESET_GROUPS[0];
 
   function toggle(name: string) {
     setSelected((prev) => {
@@ -104,8 +174,14 @@ export function CategoryPresetPicker({
   }
 
   function confirm() {
-    const chosen = CATEGORY_PRESETS.filter((p) => selected.has(p.name));
-    onConfirm(chosen);
+    // Dedupe by name across cuisines; first match wins.
+    const byName = new Map<string, CategoryPreset>();
+    for (const g of PRESET_GROUPS) {
+      for (const p of g.presets) {
+        if (selected.has(p.name) && !byName.has(p.name)) byName.set(p.name, p);
+      }
+    }
+    onConfirm([...byName.values()]);
   }
 
   return (
@@ -113,17 +189,36 @@ export function CategoryPresetPicker({
       open={open}
       onClose={onClose}
       title="Add categories"
-      description="Pick from common categories to set up your menu fast."
+      description="Pick from common categories by cuisine to set up your menu fast."
       className="max-w-2xl"
     >
+      {/* Cuisine tabs */}
+      <div className="mb-4 flex flex-wrap gap-2">
+        {PRESET_GROUPS.map((g) => (
+          <button
+            key={g.cuisine}
+            type="button"
+            onClick={() => setActiveCuisine(g.cuisine)}
+            className={cn(
+              "rounded-full border px-3 py-1 text-sm font-medium transition-colors",
+              activeCuisine === g.cuisine
+                ? "border-primary bg-primary/10 text-primary"
+                : "border-border text-muted hover:bg-surface-muted",
+            )}
+          >
+            {g.cuisine}
+          </button>
+        ))}
+      </div>
+
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-        {CATEGORY_PRESETS.map((p) => {
+        {group.presets.map((p) => {
           const Icon = p.icon;
           const added = existing.has(p.name.toLowerCase());
           const isSelected = selected.has(p.name);
           return (
             <button
-              key={p.name}
+              key={`${group.cuisine}-${p.name}`}
               type="button"
               disabled={added}
               onClick={() => toggle(p.name)}
