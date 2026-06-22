@@ -14,6 +14,8 @@ import {
   BarChart3,
   CreditCard,
   Settings,
+  Monitor,
+  ChefHat,
   LogOut,
   Menu as MenuIcon,
   X,
@@ -28,7 +30,9 @@ import { useSession } from "./session-context";
 // Each item lists the roles allowed to see it; undefined = everyone.
 const NAV = [
   { href: "/dashboard", label: "Home", icon: LayoutDashboard, exact: true },
+  { href: "/dashboard/pos", label: "POS", icon: Monitor, roles: ["owner", "manager", "cashier", "waiter"] },
   { href: "/dashboard/orders", label: "Orders", icon: ReceiptText, roles: ["owner", "manager", "cashier", "waiter", "kitchen"] },
+  { href: "/dashboard/kitchen", label: "Kitchen", icon: ChefHat, roles: ["owner", "manager", "kitchen"] },
   { href: "/dashboard/menu", label: "Menu", icon: UtensilsCrossed, roles: ["owner", "manager"] },
   { href: "/dashboard/tables", label: "Tables", icon: Grid3x3, roles: ["owner", "manager", "cashier", "waiter"] },
   { href: "/dashboard/register", label: "Register", icon: Calculator, roles: ["owner", "manager", "cashier"] },

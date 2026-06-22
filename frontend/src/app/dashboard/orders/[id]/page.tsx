@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Receipt } from "lucide-react";
 import { OrderStatus } from "@cafe/shared";
 import { useOutlet } from "@/features/dashboard/outlet-context";
 import { useSession } from "@/features/dashboard/session-context";
@@ -166,7 +166,17 @@ export default function OrderWorkspacePage() {
             <PageHeader
               title={`Order #${order.orderNumber}`}
               subtitle={`${order.table?.name ? `Table ${order.table.name} · ` : ""}${humanize(order.type)} · ${dateTime(order.createdAt)}`}
-              actions={<Badge variant={orderStatusVariant(order.status)}>{humanize(order.status)}</Badge>}
+              actions={
+                <div className="flex items-center gap-2">
+                  <Badge variant={orderStatusVariant(order.status)}>{humanize(order.status)}</Badge>
+                  <Link
+                    href={`/dashboard/orders/${order.id}/receipt`}
+                    className="inline-flex items-center gap-1 rounded-md border border-border px-3 py-1.5 text-sm text-text hover:bg-surface-muted"
+                  >
+                    <Receipt className="h-4 w-4" /> Receipt
+                  </Link>
+                </div>
+              }
             />
 
             {order.status === OrderStatus.COMPLETED && (
