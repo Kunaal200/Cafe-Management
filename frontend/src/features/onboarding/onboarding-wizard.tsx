@@ -101,9 +101,11 @@ export function OnboardingWizard() {
       router.replace("/login");
       return;
     }
-    apiFetch<{ tenantId: string | null }>("/auth/me", { auth: true })
+    apiFetch<{ tenantId: string | null; role: string }>("/auth/me", { auth: true })
       .then((me) => {
-        if (me.tenantId) {
+        if (me.role === "super_admin") {
+          router.replace("/admin");
+        } else if (me.tenantId) {
           router.replace("/dashboard");
         } else {
           setReady(true);

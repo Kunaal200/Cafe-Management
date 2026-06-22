@@ -266,7 +266,7 @@ export class OrdersService {
     for (const item of items) {
       const line = Number(item.unitPrice) * item.qty;
       subtotal += line;
-      const rule = item.menuItem.taxRule;
+      const rule = item.menuItem?.taxRule;
       if (rule) {
         const rate = Number(rule.rate);
         if (rule.mode === 'exclusive') {

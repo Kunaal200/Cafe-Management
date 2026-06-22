@@ -20,6 +20,7 @@ import { PaymentsModule } from './modules/payments/payments.module';
 import { RegisterModule } from './modules/register/register.module';
 import { SubscriptionModule } from './modules/subscription/subscription.module';
 import { ReportsModule } from './modules/reports/reports.module';
+import { AdminModule } from './modules/admin/admin.module';
 import { HealthModule } from './modules/health/health.module';
 
 @Module({
@@ -42,6 +43,7 @@ import { HealthModule } from './modules/health/health.module';
     RegisterModule,
     SubscriptionModule,
     ReportsModule,
+    AdminModule,
     HealthModule,
   ],
   providers: [

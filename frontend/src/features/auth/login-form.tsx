@@ -10,6 +10,7 @@ import { Input } from "@/design-system/input";
 import { Button } from "@/design-system/button";
 import { apiFetch, ApiError } from "@/lib/api";
 import { setTokens, type TokenPair } from "@/lib/auth";
+import type { MeResponse } from "@/lib/types";
 
 export function LoginForm() {
   const router = useRouter();
@@ -29,7 +30,9 @@ export function LoginForm() {
         body: values,
       });
       setTokens(tokens);
-      router.push("/dashboard");
+      // Platform admins go to the admin area; everyone else to the dashboard.
+      const me = await apiFetch<MeResponse>("/auth/me", { auth: true });
+      router.push(me.role === "super_admin" ? "/admin" : "/dashboard");
     } catch (err) {
       setFormError(err instanceof ApiError ? err.message : "Login failed. Please try again.");
     }

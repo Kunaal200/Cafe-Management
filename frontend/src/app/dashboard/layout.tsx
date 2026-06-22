@@ -29,7 +29,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     }
     apiFetch<MeResponse>("/auth/me", { auth: true })
       .then((data) => {
-        if (!data.tenantId) {
+        if (data.role === "super_admin") {
+          router.replace("/admin");
+        } else if (!data.tenantId) {
           router.replace("/onboarding");
         } else {
           setMe(data);
