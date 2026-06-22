@@ -19,4 +19,13 @@ export class ReportsController {
   ) {
     return this.reports.summary({ outletId, from, to });
   }
+
+  @Get('analytics')
+  analytics(
+    @Query('outletId') outletId?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+  ) {
+    return this.reports.analytics({ outletId, from, to });
+  }
 }

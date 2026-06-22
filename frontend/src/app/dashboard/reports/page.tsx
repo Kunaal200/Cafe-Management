@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { IndianRupee, ReceiptText, TrendingUp } from "lucide-react";
+import { IndianRupee, ReceiptText, TrendingUp, TrendingDown, Clock, Users, UtensilsCrossed } from "lucide-react";
 import { useOutlet } from "@/features/dashboard/outlet-context";
 import { PageHeader, Card, StateBlock } from "@/features/dashboard/ui";
 import { useApi } from "@/lib/use-api";
@@ -16,6 +16,16 @@ interface ReportSummary {
   daily: { date: string; revenue: number; orders: number }[];
   topItems: { name: string; qty: number; revenue: number }[];
   orderTypes: { type: string; count: number }[];
+}
+
+interface Analytics {
+  revenue: number;
+  orderCount: number;
+  revenueGrowthPct: number | null;
+  orderGrowthPct: number | null;
+  hourly: { hour: number; orders: number; revenue: number }[];
+  staff: { name: string; orders: number; revenue: number }[];
+  categories: { name: string; qty: number; revenue: number }[];
 }
 
 const RANGES = [
@@ -68,6 +78,10 @@ export default function ReportsPage() {
     ? `/reports/summary?outletId=${selected.id}${from ? `&from=${encodeURIComponent(from)}` : ""}`
     : null;
   const { data, error, loading } = useApi<ReportSummary>(query);
+  const analyticsQuery = selected
+    ? `/reports/analytics?outletId=${selected.id}${from ? `&from=${encodeURIComponent(from)}` : ""}`
+    : null;
+  const { data: analytics } = useApi<Analytics>(analyticsQuery);
 
   const maxDaily = Math.max(1, ...(data?.daily ?? []).map((d) => d.revenue));
   const maxItem = Math.max(1, ...(data?.topItems ?? []).map((i) => i.qty));
@@ -107,6 +121,14 @@ export default function ReportsPage() {
               <Stat label="Revenue" value={money(data.revenue, currency)} icon={IndianRupee} />
               <Stat label="Avg order value" value={money(data.avgOrderValue, currency)} icon={TrendingUp} />
             </div>
+
+            {/* Growth vs previous period */}
+            {analytics && (analytics.revenueGrowthPct !== null || analytics.orderGrowthPct !== null) && (
+              <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                <GrowthCard label="Revenue growth" pct={analytics.revenueGrowthPct} />
+                <GrowthCard label="Order growth" pct={analytics.orderGrowthPct} />
+              </div>
+            )}
 
             {/* Daily revenue trend */}
             <Card className="mt-6">
@@ -198,9 +220,110 @@ export default function ReportsPage() {
                 </div>
               )}
             </Card>
+
+            {/* Hourly distribution */}
+            {analytics && (
+              <Card className="mt-6">
+                <h2 className="mb-4 flex items-center gap-2 text-sm font-semibold text-text">
+                  <Clock className="h-4 w-4 text-muted" /> Busiest hours
+                </h2>
+                {analytics.orderCount === 0 ? (
+                  <p className="py-6 text-center text-sm text-muted">No sales in this period.</p>
+                ) : (
+                  <div className="flex h-32 items-end gap-0.5">
+                    {analytics.hourly.map((h) => {
+                      const max = Math.max(1, ...analytics.hourly.map((x) => x.orders));
+                      return (
+                        <div
+                          key={h.hour}
+                          className="flex flex-1 flex-col items-center gap-1"
+                          title={`${h.hour}:00 — ${h.orders} orders`}
+                        >
+                          <div
+                            className="w-full rounded-t bg-accent/70"
+                            style={{ height: `${(h.orders / max) * 100}%` }}
+                          />
+                          {h.hour % 3 === 0 && <span className="text-[9px] text-muted">{h.hour}</span>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </Card>
+            )}
+
+            {analytics && (
+              <div className="mt-6 grid gap-6 lg:grid-cols-2">
+                {/* Staff performance */}
+                <Card>
+                  <h2 className="mb-4 flex items-center gap-2 text-sm font-semibold text-text">
+                    <Users className="h-4 w-4 text-muted" /> Staff performance
+                  </h2>
+                  {analytics.staff.length === 0 ? (
+                    <p className="py-6 text-center text-sm text-muted">No attributed orders yet.</p>
+                  ) : (
+                    <ul className="space-y-2 text-sm">
+                      {analytics.staff.map((s) => (
+                        <li key={s.name} className="flex items-center justify-between">
+                          <span className="font-medium text-text">{s.name}</span>
+                          <span className="text-muted">
+                            {s.orders} orders · {money(s.revenue, currency)}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </Card>
+
+                {/* Category performance */}
+                <Card>
+                  <h2 className="mb-4 flex items-center gap-2 text-sm font-semibold text-text">
+                    <UtensilsCrossed className="h-4 w-4 text-muted" /> Category performance
+                  </h2>
+                  {analytics.categories.length === 0 ? (
+                    <p className="py-6 text-center text-sm text-muted">No sales in this period.</p>
+                  ) : (
+                    <ul className="space-y-3">
+                      {analytics.categories.map((c) => {
+                        const max = Math.max(1, ...analytics.categories.map((x) => x.revenue));
+                        return (
+                          <li key={c.name}>
+                            <div className="mb-1 flex items-center justify-between text-sm">
+                              <span className="font-medium text-text">{c.name}</span>
+                              <span className="text-muted">{c.qty} sold · {money(c.revenue, currency)}</span>
+                            </div>
+                            <div className="h-2 overflow-hidden rounded-full bg-surface-muted">
+                              <div className="h-full rounded-full bg-primary" style={{ width: `${(c.revenue / max) * 100}%` }} />
+                            </div>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                </Card>
+              </div>
+            )}
           </>
         )}
       </StateBlock>
     </>
+  );
+}
+
+function GrowthCard({ label, pct }: { label: string; pct: number | null }) {
+  const up = (pct ?? 0) >= 0;
+  return (
+    <Card className="flex items-center justify-between">
+      <span className="text-sm text-muted">{label}</span>
+      {pct === null ? (
+        <span className="text-sm text-muted">No prior data</span>
+      ) : (
+        <span className={cn("inline-flex items-center gap-1 text-lg font-bold", up ? "text-success" : "text-danger")}>
+          {up ? <TrendingUp className="h-5 w-5" /> : <TrendingDown className="h-5 w-5" />}
+          {up ? "+" : ""}
+          {pct}%
+        </span>
+      )}
+    </Card>
   );
 }

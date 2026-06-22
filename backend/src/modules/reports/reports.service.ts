@@ -26,6 +26,106 @@ export class ReportsService {
   constructor(private readonly prisma: PrismaService) {}
 
   /**
+   * Richer analytics for the owner dashboard: order/revenue growth vs the prior
+   * period, hourly distribution, staff performance, and menu category performance.
+   */
+  async analytics(filters: SummaryFilters) {
+    const tenantId = getTenantIdOrThrow();
+
+    const now = new Date();
+    const from = filters.from ? new Date(filters.from) : undefined;
+    const fromValid = from && !Number.isNaN(from.getTime()) ? from : undefined;
+
+    const baseWhere: Prisma.OrderWhereInput = {
+      tenantId,
+      status: PrismaOrderStatus.completed,
+      ...(filters.outletId ? { outletId: filters.outletId } : {}),
+    };
+
+    const current = await this.prisma.order.findMany({
+      where: { ...baseWhere, ...(fromValid ? { createdAt: { gte: fromValid } } : {}) },
+      include: { items: true, createdBy: { select: { id: true, fullName: true } } },
+    });
+
+    // Prior period of equal length, for growth comparison.
+    let prevRevenue = 0;
+    let prevOrders = 0;
+    if (fromValid) {
+      const windowMs = now.getTime() - fromValid.getTime();
+      const prevFrom = new Date(fromValid.getTime() - windowMs);
+      const prev = await this.prisma.order.findMany({
+        where: { ...baseWhere, createdAt: { gte: prevFrom, lt: fromValid } },
+        select: { total: true },
+      });
+      prevOrders = prev.length;
+      prevRevenue = prev.reduce((sum, o) => sum + Number(o.total), 0);
+    }
+
+    const revenue = current.reduce((sum, o) => sum + Number(o.total), 0);
+    const orderCount = current.length;
+
+    // Hourly distribution (0–23) by order count.
+    const hourly = Array.from({ length: 24 }, (_, h) => ({ hour: h, orders: 0, revenue: 0 }));
+    // Staff performance by who created the order.
+    const staffMap = new Map<string, { name: string; orders: number; revenue: number }>();
+    // Category performance via each item's category.
+    const itemIds = new Set<string>();
+
+    for (const o of current) {
+      const h = o.createdAt.getHours();
+      hourly[h].orders += 1;
+      hourly[h].revenue += Number(o.total);
+
+      const who = o.createdBy;
+      if (who) {
+        const cur = staffMap.get(who.id) ?? { name: who.fullName, orders: 0, revenue: 0 };
+        cur.orders += 1;
+        cur.revenue += Number(o.total);
+        staffMap.set(who.id, cur);
+      }
+      for (const it of o.items) {
+        if (it.menuItemId) itemIds.add(it.menuItemId);
+      }
+    }
+
+    // Map menu items -> category names for category performance.
+    const menuItems = itemIds.size
+      ? await this.prisma.menuItem.findMany({
+          where: { id: { in: [...itemIds] } },
+          select: { id: true, categoryId: true, category: { select: { name: true } } },
+        })
+      : [];
+    const categoryByItem = new Map(menuItems.map((m) => [m.id, m.category?.name ?? 'Uncategorized']));
+    const categoryMap = new Map<string, { qty: number; revenue: number }>();
+    for (const o of current) {
+      for (const it of o.items) {
+        const cat = (it.menuItemId && categoryByItem.get(it.menuItemId)) || 'Uncategorized';
+        const cur = categoryMap.get(cat) ?? { qty: 0, revenue: 0 };
+        cur.qty += it.qty;
+        cur.revenue += Number(it.unitPrice) * it.qty;
+        categoryMap.set(cat, cur);
+      }
+    }
+
+    const growth = (curr: number, prev: number): number | null =>
+      prev > 0 ? round2(((curr - prev) / prev) * 100) : null;
+
+    return {
+      revenue: round2(revenue),
+      orderCount,
+      revenueGrowthPct: growth(revenue, prevRevenue),
+      orderGrowthPct: growth(orderCount, prevOrders),
+      hourly,
+      staff: [...staffMap.values()]
+        .map((s) => ({ ...s, revenue: round2(s.revenue) }))
+        .sort((a, b) => b.revenue - a.revenue),
+      categories: [...categoryMap.entries()]
+        .map(([name, v]) => ({ name, qty: v.qty, revenue: round2(v.revenue) }))
+        .sort((a, b) => b.revenue - a.revenue),
+    };
+  }
+
+  /**
    * Sales summary for completed orders: revenue, order count, average value,
    * payment-method mix, daily series, top items, and order-type breakdown.
    */
