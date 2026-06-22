@@ -2,7 +2,20 @@
 
 > Companion to all planning docs. A sequenced, actionable checklist to go from zero to a working MVP.
 > Order matters: each stage unblocks the next. Check items off as you complete them.
-> Last updated: 2026-06-18
+> Last updated: 2026-06-19
+
+## Status at a glance (2026-06-19)
+- **Stage 0–4 (decisions, setup, backend, data model, endpoints): ~95% done** — full backend MVP live; only RLS + automated tests pending.
+- **Stage 5 (design system & shared UI): ~80% done** — custom token-based design system + dashboard/public shells built; POS & KDS shells not built; used `useApi` instead of TanStack Query, no shadcn/ui (own components).
+- **Stage 6 (frontend MVP pages): ~70% done** — owner/manager dashboard + onboarding fully built (plus Staff, Register, Reports). Platform Admin, dedicated POS app, KDS, and Receipt screens not built.
+- **Stage 7 (integrations): 0%** — payment gateway, receipt printing, email/SMS OTP all pending.
+- **Stage 8 (quality/security): ~30%** — Zod validation + env secrets done; no automated tests, no a11y pass.
+- **Stage 9 (DevOps/deploy): ~10%** — Dockerfiles exist; nothing deployed, no CI.
+- **Stage 10 (post-MVP): partial** — Staff management & basic Reports already built early.
+
+> Extra work beyond the original MVP plan: editable settings, role-filtered nav, sequential order numbers,
+> menu item attributes (veg/spicy/sweet/serves), category→subcategory hierarchy, cuisine category presets,
+> onboarding back-navigation + exit guard, and a reporting summary endpoint.
 
 ## How to read this
 - Stages are ordered. Finish (or mostly finish) a stage before moving on.
@@ -97,7 +110,7 @@
 - [x] Auth: signup, login, verify OTP, refresh, me (logout = client token discard for now)
 - [x] Staff: owner creates username/password accounts with roles (kitchen/cashier/etc.); tenant-scoped staff login via subdomain+username
 - [x] Onboarding: create tenant, create outlet, set localization/tax, seed menu/tables (see `ONBOARDING.md`)
-- [ ] Tenants/Outlets CRUD — partial (created via onboarding; standalone CRUD pending)
+- [x] Tenants/Outlets CRUD — outlets list/get + update (`GET /outlets`, `PATCH /outlets/:id`); standalone tenant CRUD still minimal
 - [x] Menu: categories & items CRUD, availability toggle
 - [x] Tables/floor: CRUD + status
 - [x] Orders: create, add/update items, send KOT, list, detail, status transitions (validated lifecycle)
@@ -111,14 +124,14 @@
 ## Stage 5 — Design system & shared UI
 > See `FRONTEND_DESIGN_SYSTEM.md` Parts C–E. Do this before building pages.
 
-- [ ] Scaffold frontend app(s): dashboard (Next.js), POS/KDS (Vite SPA)
-- [ ] Configure Tailwind with design tokens (colors, typography, spacing, radius, shadows)
-- [ ] Install shadcn/ui + lucide-react; set theme (light; dark optional)
-- [ ] Build primitives: Button, Input, Select, Checkbox/Radio/Switch, Badge, Avatar
-- [ ] Build composites: DataTable, Form (RHF+Zod), Modal/Drawer, Tabs, Toast, Dropdown, DatePicker, EmptyState/Skeleton, Chart widgets
-- [ ] Build layouts: dashboard app shell (top bar + sidebar + outlet switcher), POS shell (touch-first), KDS shell, public shell
-- [ ] Set up API client (TanStack Query) + auth context + role-aware rendering
-- [ ] Set up routing, i18n scaffold, error boundaries
+- [~] Scaffold frontend app(s): dashboard (Next.js) **built**; POS/KDS (Vite SPA) **not built**
+- [x] Configure Tailwind with design tokens (colors, typography, spacing, radius, shadows)
+- [~] shadcn/ui + lucide-react — used **custom token-based components** instead of shadcn; lucide-react in use; light theme
+- [x] Build primitives: Button, Input, Select, Checkbox, Badge (Avatar/Switch not needed yet)
+- [~] Composites: Modal, Form (RHF+Zod), Toast, Combobox/Dropdown, confirm dialog, StateBlock (empty/loading) **built**; DataTable (plain tables), simple chart bars; DatePicker/Skeleton **not built**
+- [~] Layouts: dashboard app shell (top bar + sidebar + outlet switcher) + public shell **built**; POS shell, KDS shell **not built**
+- [~] API client (custom `useApi` hook, not TanStack Query) + auth/session context + role-aware rendering **built**
+- [~] Routing **done**; error boundaries minimal; i18n scaffold **not done**
 
 ---
 
@@ -126,24 +139,26 @@
 > See `FRONTEND_PAGES.md` MVP set.
 
 ### Public / Onboarding
-- [ ] Landing, Pricing, Signup, Login
-- [ ] Onboarding wizard shell + steps (account → business → outlet → localization → menu → tables → staff → plan → finish)
+- [x] Landing, Pricing, Signup, Login
+- [~] Onboarding wizard shell + steps (account → business → outlet → localization → menu → tables → finish) **built** with back-nav + presets; **staff & plan steps not in wizard** (staff is its own page, plan via Subscription)
 
 ### Platform Admin
-- [ ] Admin Login, Tenants List, Tenant Detail
+- [ ] Admin Login, Tenants List, Tenant Detail — **not built** (super_admin platform UI)
 
 ### Owner/Manager Dashboard
-- [ ] Dashboard Home (stats, live orders, alerts, outlet switcher)
-- [ ] Orders List + Order Detail
-- [ ] Menu Categories + Menu Items
-- [ ] Tables & Floor Plan
-- [ ] Outlet Settings, Account/Profile, Subscription/Billing
+- [x] Dashboard Home (stats, live orders, outlet switcher)
+- [x] Orders List + Order Detail (order workspace with build/checkout)
+- [x] Menu Categories + Menu Items (with subcategories + attributes + presets)
+- [x] Tables & Floor Plan
+- [x] Outlet Settings, Account/Profile (editable), Subscription/Billing
+- [x] **Extra:** Staff management, Register/shift, Reports
 
 ### POS App
-- [ ] POS Login/PIN, Order Screen, Checkout/Payment, Receipt, Shift/Register
+- [~] Order Screen + Checkout/Payment + Shift/Register — **functionality built inside the dashboard**, not as a separate touch-first POS app
+- [ ] POS Login/PIN, Receipt — **not built**
 
 ### KDS
-- [ ] Order Queue screen
+- [ ] Order Queue screen — **not built**
 
 ---
 
@@ -160,9 +175,9 @@
 - [ ] Component + e2e tests (frontend: Vitest/Testing Library + Playwright)
 - [ ] Tenant isolation security test (no cross-tenant data access)
 - [ ] Auth/RBAC test matrix (each role sees only allowed actions)
-- [ ] Input validation & sanitization on all endpoints
-- [ ] Secrets in env/secret manager, not in code
-- [ ] Run a full happy-path: signup → onboard → take order → pay → receipt
+- [x] Input validation & sanitization on all endpoints (Zod schemas via shared package)
+- [x] Secrets in env/secret manager, not in code
+- [~] Run a full happy-path: signup → onboard → take order → pay (receipt step not built; verified via build + manual smoke, not a live run)
 - [ ] Accessibility pass on core components (keyboard, contrast, ARIA)
 
 ---
@@ -172,7 +187,7 @@
 
 - [ ] CI pipeline: lint + test + build on every PR
 - [ ] Staging environment (DB, API, web)
-- [ ] Containerize backend; configure migrations on deploy
+- [~] Containerize backend; configure migrations on deploy — Dockerfiles exist (backend + frontend); migrate-on-deploy not wired yet
 - [ ] Managed PostgreSQL + Redis; backups enabled
 - [ ] CDN for frontend static assets/images; object storage for uploads
 - [ ] TLS, WAF/rate limiting at the edge
@@ -187,7 +202,7 @@
 - [ ] Phase 2: Inventory, recipes, suppliers, central kitchen, KDS depth
 - [ ] Phase 3: Reservations, CRM, loyalty, feedback, marketing
 - [ ] Phase 4: Online ordering, aggregator sync, more payments, accounting
-- [ ] Phase 5: Analytics/reports depth, AI features, staff management/payroll
+- [~] Phase 5: Analytics/reports depth, AI features, staff management/payroll — **basic Staff management + Reports already built**; depth/AI/payroll pending
 - [ ] Mobile: PWA → React Native waiter app → owner/customer apps
 
 ---
