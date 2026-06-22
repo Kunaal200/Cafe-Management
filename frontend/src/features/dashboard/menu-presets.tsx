@@ -31,6 +31,9 @@ import { Modal } from "@/design-system/modal";
 import { Button } from "@/design-system/button";
 import { cn } from "@/lib/utils";
 
+// Default icon for categories without a preset match.
+import { UtensilsCrossed as DefaultCategoryIcon } from "lucide-react";
+
 export interface CategoryPreset {
   name: string;
   icon: LucideIcon;
@@ -128,6 +131,24 @@ export const PRESET_GROUPS: PresetGroup[] = [
     ],
   },
 ];
+
+/**
+ * Best-effort icon for a category by name, reusing the preset icons so saved
+ * categories show a relevant logo. Falls back to a generic utensils icon.
+ */
+const ICON_BY_NAME: Record<string, LucideIcon> = (() => {
+  const map: Record<string, LucideIcon> = {};
+  for (const g of PRESET_GROUPS) {
+    for (const p of g.presets) {
+      map[p.name.toLowerCase()] = p.icon;
+    }
+  }
+  return map;
+})();
+
+export function getCategoryIcon(name: string): LucideIcon {
+  return ICON_BY_NAME[name.trim().toLowerCase()] ?? DefaultCategoryIcon;
+}
 
 /**
  * Multi-select modal of preset categories grouped by cuisine. Categories already

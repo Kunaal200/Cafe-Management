@@ -17,18 +17,25 @@ export function MenuItemBadges({ item, className }: { item: MenuItem; className?
     <div className={cn("flex flex-wrap items-center gap-1.5", className)}>
       {item.isVeg != null && (
         <span
-          title={item.isVeg ? "Vegetarian" : "Non-vegetarian"}
           className={cn(
-            "flex h-4 w-4 items-center justify-center rounded-sm border",
-            item.isVeg ? "border-success" : "border-danger",
+            "inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[11px] font-medium",
+            item.isVeg ? "bg-success/10 text-success" : "bg-danger/10 text-danger",
           )}
         >
           <span
             className={cn(
-              "h-2 w-2 rounded-full",
-              item.isVeg ? "bg-success" : "bg-danger",
+              "flex h-3 w-3 items-center justify-center rounded-sm border",
+              item.isVeg ? "border-success" : "border-danger",
             )}
-          />
+          >
+            <span
+              className={cn(
+                "h-1.5 w-1.5 rounded-full",
+                item.isVeg ? "bg-success" : "bg-danger",
+              )}
+            />
+          </span>
+          {item.isVeg ? "Veg" : "Non-veg"}
         </span>
       )}
       {item.isSpicy && (

@@ -13,7 +13,7 @@ import { Modal } from "@/design-system/modal";
 import { useConfirm } from "@/design-system/confirm-dialog";
 import { useToast } from "@/features/dashboard/toast";
 import { MenuItemBadges } from "@/features/dashboard/menu-badges";
-import { CategoryPresetPicker, type CategoryPreset } from "@/features/dashboard/menu-presets";
+import { CategoryPresetPicker, getCategoryIcon, type CategoryPreset } from "@/features/dashboard/menu-presets";
 import { useApi } from "@/lib/use-api";
 import { apiFetch, ApiError } from "@/lib/api";
 import type { MenuCategory, MenuItem } from "@/lib/types";
@@ -290,10 +290,17 @@ export default function MenuPage() {
         emptyText="No categories yet. Add one to start building your menu."
       >
         <div className="space-y-6">
-          {topCats.map((cat) => (
+          {topCats.map((cat) => {
+            const CatIcon = getCategoryIcon(cat.name);
+            return (
             <Card key={cat.id} className="p-0">
               <div className="flex items-center justify-between gap-2 border-b border-border px-5 py-3">
-                <h2 className="font-semibold text-text">{cat.name}</h2>
+                <h2 className="flex items-center gap-2 font-semibold text-text">
+                  <span className="flex h-8 w-8 items-center justify-center rounded-md bg-primary/10 text-primary">
+                    <CatIcon className="h-4 w-4" />
+                  </span>
+                  {cat.name}
+                </h2>
                 <div className="flex items-center gap-1">
                   <Button variant="ghost" size="sm" onClick={() => openNewItem(cat.id)}>
                     <Plus className="h-4 w-4" /> Item
@@ -348,7 +355,8 @@ export default function MenuPage() {
                 </div>
               ))}
             </Card>
-          ))}
+            );
+          })}
         </div>
       </StateBlock>
 

@@ -299,7 +299,7 @@ model OrderItem {
   id         String   @id @default(uuid())
   tenantId   String
   orderId    String
-  menuItemId String
+  menuItemId String?
   name       String
   qty        Int      @default(1)
   unitPrice  Decimal  @db.Decimal(10, 2)
@@ -307,8 +307,8 @@ model OrderItem {
   notes      String?
   createdAt  DateTime @default(now())
 
-  order    Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  menuItem MenuItem @relation(fields: [menuItemId], references: [id])
+  order    Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  menuItem MenuItem? @relation(fields: [menuItemId], references: [id], onDelete: SetNull)
 
   @@index([tenantId])
   @@index([orderId])
