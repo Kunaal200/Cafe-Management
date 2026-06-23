@@ -1,13 +1,18 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
-import { ReceiptText, Clock, CheckCircle2, IndianRupee, ArrowRight } from "lucide-react";
+import { ReceiptText, Clock, CheckCircle2, IndianRupee, ArrowRight, Plus } from "lucide-react";
 import { useOutlet } from "@/features/dashboard/outlet-context";
+import { useSession } from "@/features/dashboard/session-context";
+import { NewOrderModal } from "@/features/dashboard/new-order-modal";
 import { PageHeader, Card, StateBlock } from "@/features/dashboard/ui";
 import { Badge } from "@/design-system/badge";
+import { Button } from "@/design-system/button";
 import { useApi } from "@/lib/use-api";
 import type { Order } from "@/lib/types";
 import { money, timeAgo, humanize, orderStatusVariant, LIVE_STATUSES } from "@/lib/format";
+import { canTakeOrders } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
 
 function isToday(iso: string): boolean {
@@ -64,6 +69,8 @@ function Stat({
 
 export default function DashboardHome() {
   const { selected, currency, loading: outletLoading } = useOutlet();
+  const session = useSession();
+  const [newOrderOpen, setNewOrderOpen] = useState(false);
   const { data, error, loading } = useApi<Order[]>(
     selected ? `/orders?outletId=${selected.id}` : null,
     { pollMs: 15000 },
@@ -80,6 +87,13 @@ export default function DashboardHome() {
       <PageHeader
         title="Dashboard"
         subtitle={selected ? `${selected.name}${selected.city ? ` · ${selected.city}` : ""}` : undefined}
+        actions={
+          canTakeOrders(session.role) ? (
+            <Button onClick={() => setNewOrderOpen(true)} disabled={!selected}>
+              <Plus className="h-4 w-4" /> New order
+            </Button>
+          ) : undefined
+        }
       />
 
       <StateBlock
@@ -107,8 +121,13 @@ export default function DashboardHome() {
           </div>
 
           {live.length === 0 ? (
-            <Card className="py-12 text-center text-sm text-muted">
+            <Card className="flex flex-col items-center gap-3 py-12 text-center text-sm text-muted">
               No active orders right now.
+              {canTakeOrders(session.role) && (
+                <Button onClick={() => setNewOrderOpen(true)} disabled={!selected}>
+                  <Plus className="h-4 w-4" /> New order
+                </Button>
+              )}
             </Card>
           ) : (
             <Card className="divide-y divide-border p-0">
@@ -136,6 +155,8 @@ export default function DashboardHome() {
           )}
         </div>
       </StateBlock>
+
+      <NewOrderModal open={newOrderOpen} onClose={() => setNewOrderOpen(false)} />
     </>
   );
 }
