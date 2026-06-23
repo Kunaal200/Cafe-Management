@@ -12,6 +12,8 @@ import { Input } from "@/design-system/input";
 import { PasswordInput } from "@/design-system/password-input";
 import { apiFetch, ApiError } from "@/lib/api";
 import { humanize } from "@/lib/format";
+import { useTheme, THEMES } from "@/features/theme-provider";
+import { cn } from "@/lib/utils";
 
 export default function SettingsPage() {
   const session = useSession();
@@ -25,11 +27,66 @@ export default function SettingsPage() {
       <PageHeader title="Settings" subtitle="Your account and outlet details." />
 
       <div className="grid gap-6 lg:grid-cols-2">
+        <AppearanceCard />
         <ProfileCard email={session.email} role={session.role} />
         <PasswordCard />
         {selected && <OutletCard key={selected.id} editable={canEditOutlet} onSaved={refresh} />}
       </div>
     </>
+  );
+}
+
+function AppearanceCard() {
+  const { themeId, dark, setTheme, setDark } = useTheme();
+  return (
+    <Card>
+      <h2 className="mb-1 text-sm font-semibold text-text">Appearance</h2>
+      <p className="mb-4 text-xs text-muted">Pick an accent color and light/dark mode. Saved on this device.</p>
+
+      <div className="mb-5 flex flex-wrap gap-3">
+        {THEMES.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            onClick={() => setTheme(t.id)}
+            aria-label={t.name}
+            className={cn(
+              "flex flex-col items-center gap-1.5",
+            )}
+          >
+            <span
+              className={cn(
+                "flex h-10 w-10 items-center justify-center rounded-full ring-offset-2 ring-offset-surface",
+                themeId === t.id ? "ring-2 ring-text" : "",
+              )}
+              style={{ backgroundColor: t.swatch }}
+            />
+            <span className="text-xs text-muted">{t.name}</span>
+          </button>
+        ))}
+      </div>
+
+      <label className="flex items-center justify-between rounded-lg border border-border px-4 py-3">
+        <span className="text-sm font-medium text-text">Dark mode</span>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={dark}
+          onClick={() => setDark(!dark)}
+          className={cn(
+            "relative h-6 w-11 rounded-full transition-colors",
+            dark ? "bg-primary" : "bg-surface-muted",
+          )}
+        >
+          <span
+            className={cn(
+              "absolute top-0.5 h-5 w-5 rounded-full bg-surface shadow transition-transform",
+              dark ? "left-0.5 translate-x-5" : "left-0.5",
+            )}
+          />
+        </button>
+      </label>
+    </Card>
   );
 }
 
