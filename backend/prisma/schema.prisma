@@ -93,6 +93,7 @@ model Tenant {
   customers     Customer[]
   coupons       Coupon[]
   feedback      Feedback[]
+  inventoryItems InventoryItem[]
   auditLogs     AuditLog[]
 
   @@map("tenants")
@@ -407,4 +408,57 @@ model AuditLog {
 
   @@index([tenantId])
   @@map("audit_logs")
+}
+
+model InventoryItem {
+  id           String   @id @default(uuid())
+  tenantId     String
+  name         String
+  unit         String   @default("unit") // e.g. "L", "kg", "g", "ml", "unit"
+  reorderLevel Decimal  @default(0) @db.Decimal(12, 3)
+  perishable   Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  tenant    Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  batches   StockBatch[]
+  movements StockMovement[]
+
+  @@index([tenantId])
+  @@map("inventory_items")
+}
+
+model StockBatch {
+  id           String    @id @default(uuid())
+  tenantId     String
+  itemId       String
+  qty          Decimal   @db.Decimal(12, 3) // received quantity
+  remainingQty Decimal   @db.Decimal(12, 3)
+  unitCost     Decimal   @db.Decimal(12, 4)
+  receivedAt   DateTime  @default(now())
+  expiresAt    DateTime?
+  createdAt    DateTime  @default(now())
+
+  item InventoryItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([itemId])
+  @@map("stock_batches")
+}
+
+model StockMovement {
+  id        String   @id @default(uuid())
+  tenantId  String
+  itemId    String
+  type      String // 'in' | 'out' | 'waste' | 'adjust'
+  qty       Decimal  @db.Decimal(12, 3)
+  reason    String?
+  createdAt DateTime @default(now())
+
+  item InventoryItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([itemId])
+  @@index([createdAt])
+  @@map("stock_movements")
 }
