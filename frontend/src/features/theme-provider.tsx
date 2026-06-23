@@ -20,7 +20,7 @@ const ThemeContext = createContext<ThemeContextValue | null>(null);
 
 /** Applies the saved theme on mount and exposes setters that persist + re-skin. */
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [themeId, setThemeId] = useState("indigo");
+  const [themeId, setThemeId] = useState("forest");
   const [dark, setDarkState] = useState(false);
 
   useEffect(() => {

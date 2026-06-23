@@ -32,24 +32,54 @@ import { clearTokens } from "@/lib/auth";
 import { useOutlet } from "./outlet-context";
 import { useSession } from "./session-context";
 
-// Each item lists the roles allowed to see it; undefined = everyone.
-const NAV = [
-  { href: "/dashboard", label: "Home", icon: LayoutDashboard, exact: true },
-  { href: "/dashboard/pos", label: "POS", icon: Monitor, roles: ["owner", "manager", "cashier", "waiter"] },
-  { href: "/dashboard/orders", label: "Orders", icon: ReceiptText, roles: ["owner", "manager", "cashier", "waiter", "kitchen"] },
-  { href: "/dashboard/kitchen", label: "Kitchen", icon: ChefHat, roles: ["owner", "manager", "kitchen"] },
-  { href: "/dashboard/menu", label: "Menu", icon: UtensilsCrossed, roles: ["owner", "manager"] },
-  { href: "/dashboard/inventory", label: "Inventory", icon: Boxes, roles: ["owner", "manager", "kitchen"] },
-  { href: "/dashboard/tables", label: "Tables", icon: Grid3x3, roles: ["owner", "manager", "cashier", "waiter"] },
-  { href: "/dashboard/register", label: "Register", icon: Calculator, roles: ["owner", "manager", "cashier"] },
-  { href: "/dashboard/staff", label: "Staff", icon: Users, roles: ["owner", "manager"] },
-  { href: "/dashboard/customers", label: "Customers", icon: UserRound, roles: ["owner", "manager"] },
-  { href: "/dashboard/feedback", label: "Feedback", icon: MessageSquare, roles: ["owner", "manager"] },
-  { href: "/dashboard/coupons", label: "Coupons", icon: Ticket, roles: ["owner", "manager"] },
-  { href: "/dashboard/reports", label: "Reports", icon: BarChart3, roles: ["owner", "manager"] },
-  { href: "/dashboard/margins", label: "Margins", icon: TrendingUp, roles: ["owner", "manager"] },
-  { href: "/dashboard/subscription", label: "Subscription", icon: CreditCard, roles: ["owner"] },
-  { href: "/dashboard/settings", label: "Settings", icon: Settings },
+// Grouped nav. Each item lists the roles allowed to see it; undefined = everyone.
+const NAV_GROUPS: {
+  label?: string;
+  items: { href: string; label: string; icon: typeof LayoutDashboard; exact?: boolean; roles?: string[] }[];
+}[] = [
+  {
+    items: [{ href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, exact: true }],
+  },
+  {
+    label: "Operations",
+    items: [
+      { href: "/dashboard/pos", label: "POS", icon: Monitor, roles: ["owner", "manager", "cashier", "waiter"] },
+      { href: "/dashboard/orders", label: "Orders", icon: ReceiptText, roles: ["owner", "manager", "cashier", "waiter", "kitchen"] },
+      { href: "/dashboard/kitchen", label: "Kitchen", icon: ChefHat, roles: ["owner", "manager", "kitchen"] },
+      { href: "/dashboard/tables", label: "Tables", icon: Grid3x3, roles: ["owner", "manager", "cashier", "waiter"] },
+      { href: "/dashboard/register", label: "Register", icon: Calculator, roles: ["owner", "manager", "cashier"] },
+    ],
+  },
+  {
+    label: "Catalog",
+    items: [
+      { href: "/dashboard/menu", label: "Menu", icon: UtensilsCrossed, roles: ["owner", "manager"] },
+      { href: "/dashboard/inventory", label: "Inventory", icon: Boxes, roles: ["owner", "manager", "kitchen"] },
+    ],
+  },
+  {
+    label: "Partners",
+    items: [
+      { href: "/dashboard/staff", label: "Staff", icon: Users, roles: ["owner", "manager"] },
+      { href: "/dashboard/customers", label: "Customers", icon: UserRound, roles: ["owner", "manager"] },
+      { href: "/dashboard/feedback", label: "Feedback", icon: MessageSquare, roles: ["owner", "manager"] },
+      { href: "/dashboard/coupons", label: "Coupons", icon: Ticket, roles: ["owner", "manager"] },
+    ],
+  },
+  {
+    label: "Insights",
+    items: [
+      { href: "/dashboard/reports", label: "Reports", icon: BarChart3, roles: ["owner", "manager"] },
+      { href: "/dashboard/margins", label: "Margins", icon: TrendingUp, roles: ["owner", "manager"] },
+    ],
+  },
+  {
+    label: "Account",
+    items: [
+      { href: "/dashboard/subscription", label: "Subscription", icon: CreditCard, roles: ["owner"] },
+      { href: "/dashboard/settings", label: "Settings", icon: Settings },
+    ],
+  },
 ];
 
 function OutletSwitcher() {
@@ -103,53 +133,68 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   const session = useSession();
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  const navItems = NAV.filter((item) => !item.roles || item.roles.includes(session.role));
+  // Filter items by role, then drop any group left with no visible items.
+  const groups = NAV_GROUPS.map((g) => ({
+    label: g.label,
+    items: g.items.filter((item) => !item.roles || item.roles.includes(session.role)),
+  })).filter((g) => g.items.length > 0);
 
   function logout() {
     clearTokens();
     router.replace("/login");
   }
 
-  function isActive(item: (typeof NAV)[number]) {
+  function isActive(item: { href: string; exact?: boolean }) {
     return item.exact ? pathname === item.href : pathname.startsWith(item.href);
   }
 
   const sidebar = (
     <nav className="flex h-full flex-col">
-      <div className="flex h-16 items-center gap-2 px-5 font-semibold text-text">
-        <span className="flex h-8 w-8 items-center justify-center rounded-md bg-primary text-primary-fg">
+      <div className="flex h-16 items-center gap-2 px-5 text-lg font-bold tracking-tight text-text">
+        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-fg">
           <Coffee className="h-5 w-5" />
         </span>
         BrewDesk
       </div>
-      <ul className="flex-1 space-y-1 px-3 py-2">
-        {navItems.map((item) => {
-          const Icon = item.icon;
-          const active = isActive(item);
-          return (
-            <li key={item.href}>
-              <Link
-                href={item.href}
-                onClick={() => setMobileOpen(false)}
-                className={cn(
-                  "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
-                  active
-                    ? "bg-primary/10 text-primary"
-                    : "text-muted hover:bg-surface-muted hover:text-text",
-                )}
-              >
-                <Icon className="h-4 w-4" />
-                {item.label}
-              </Link>
-            </li>
-          );
-        })}
-      </ul>
+      <div className="flex-1 overflow-y-auto px-3 py-2">
+        {groups.map((group, gi) => (
+          <div key={group.label ?? gi} className="mb-4">
+            {group.label && (
+              <p className="px-3 pb-1.5 pt-2 text-[11px] font-semibold uppercase tracking-wider text-muted/70">
+                {group.label}
+              </p>
+            )}
+            <ul className="space-y-0.5">
+              {group.items.map((item) => {
+                const Icon = item.icon;
+                const active = isActive(item);
+                return (
+                  <li key={item.href}>
+                    <Link
+                      href={item.href}
+                      onClick={() => setMobileOpen(false)}
+                      className={cn(
+                        "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                        active
+                          ? "bg-primary/10 text-primary"
+                          : "text-muted hover:bg-surface-muted hover:text-text",
+                      )}
+                    >
+                      <Icon className="h-4 w-4 shrink-0" />
+                      {item.label}
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        ))}
+      </div>
       <div className="border-t border-border p-3">
         <button
           type="button"
           onClick={logout}
-          className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-muted hover:bg-surface-muted hover:text-text"
+          className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-muted hover:bg-surface-muted hover:text-text"
         >
           <LogOut className="h-4 w-4" />
           Log out

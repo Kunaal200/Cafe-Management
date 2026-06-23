@@ -15,6 +15,7 @@ export interface Theme {
 }
 
 export const THEMES: Theme[] = [
+  { id: "forest", name: "Forest", primary: "#047857", primaryHover: "#036049", accent: "#0d9488", swatch: "#047857" },
   { id: "indigo", name: "Indigo", primary: "#4f46e5", primaryHover: "#4338ca", accent: "#0ea5e9", swatch: "#4f46e5" },
   { id: "emerald", name: "Emerald", primary: "#059669", primaryHover: "#047857", accent: "#14b8a6", swatch: "#059669" },
   { id: "rose", name: "Rose", primary: "#e11d48", primaryHover: "#be123c", accent: "#fb7185", swatch: "#e11d48" },
@@ -25,22 +26,24 @@ export const THEMES: Theme[] = [
 ];
 
 const NEUTRAL_LIGHT: Record<string, string> = {
-  "--color-bg": "#f8fafc",
+  "--color-bg": "#f6f7f4",
   "--color-surface": "#ffffff",
-  "--color-surface-muted": "#f1f5f9",
-  "--color-border": "#e2e8f0",
-  "--color-text": "#0f172a",
-  "--color-text-muted": "#64748b",
+  "--color-surface-muted": "#f1f3ef",
+  "--color-border": "#e6e9e2",
+  "--color-text": "#16241d",
+  "--color-text-muted": "#677067",
 };
 
 const NEUTRAL_DARK: Record<string, string> = {
-  "--color-bg": "#0b1120",
-  "--color-surface": "#111827",
-  "--color-surface-muted": "#1e293b",
-  "--color-border": "#334155",
-  "--color-text": "#f1f5f9",
-  "--color-text-muted": "#94a3b8",
+  "--color-bg": "#0c1a14",
+  "--color-surface": "#11241b",
+  "--color-surface-muted": "#1a3127",
+  "--color-border": "#26402f",
+  "--color-text": "#eef2ee",
+  "--color-text-muted": "#9bb0a3",
 };
+
+const DEFAULT_THEME = "forest";
 
 export const THEME_KEY = "cafe.themeId";
 export const DARK_KEY = "cafe.dark";
@@ -65,9 +68,9 @@ export function applyThemeVars(vars: Record<string, string>): void {
 }
 
 export function loadThemeState(): { themeId: string; dark: boolean } {
-  if (typeof window === "undefined") return { themeId: "indigo", dark: false };
+  if (typeof window === "undefined") return { themeId: DEFAULT_THEME, dark: false };
   return {
-    themeId: localStorage.getItem(THEME_KEY) ?? "indigo",
+    themeId: localStorage.getItem(THEME_KEY) ?? DEFAULT_THEME,
     dark: localStorage.getItem(DARK_KEY) === "1",
   };
 }

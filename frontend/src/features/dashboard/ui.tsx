@@ -29,7 +29,10 @@ export function PageHeader({
 export function Card({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
   return (
     <div
-      className={cn("rounded-xl border border-border bg-surface p-5", className)}
+      className={cn(
+        "rounded-xl border border-border bg-surface p-5 shadow-sm shadow-black/[0.03]",
+        className,
+      )}
       {...props}
     />
   );

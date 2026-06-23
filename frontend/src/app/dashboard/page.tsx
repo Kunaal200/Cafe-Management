@@ -8,6 +8,7 @@ import { Badge } from "@/design-system/badge";
 import { useApi } from "@/lib/use-api";
 import type { Order } from "@/lib/types";
 import { money, timeAgo, humanize, orderStatusVariant, LIVE_STATUSES } from "@/lib/format";
+import { cn } from "@/lib/utils";
 
 function isToday(iso: string): boolean {
   const d = new Date(iso);
@@ -23,14 +24,34 @@ function Stat({
   label,
   value,
   icon: Icon,
+  accent = "primary",
 }: {
   label: string;
   value: string;
   icon: React.ComponentType<{ className?: string }>;
+  accent?: "primary" | "accent" | "warning" | "success";
 }) {
+  const ring = {
+    primary: "before:bg-primary",
+    accent: "before:bg-accent",
+    warning: "before:bg-warning",
+    success: "before:bg-success",
+  }[accent];
+  const iconColor = {
+    primary: "bg-primary/10 text-primary",
+    accent: "bg-accent/10 text-accent",
+    warning: "bg-warning/10 text-warning",
+    success: "bg-success/10 text-success",
+  }[accent];
   return (
-    <Card className="flex items-center gap-4">
-      <span className="flex h-11 w-11 items-center justify-center rounded-lg bg-primary/10 text-primary">
+    <Card
+      className={cn(
+        "relative flex items-center gap-4 overflow-hidden",
+        "before:absolute before:inset-x-0 before:top-0 before:h-1",
+        ring,
+      )}
+    >
+      <span className={cn("flex h-11 w-11 items-center justify-center rounded-lg", iconColor)}>
         <Icon className="h-5 w-5" />
       </span>
       <div>
@@ -68,10 +89,10 @@ export default function DashboardHome() {
         emptyText="No outlet found. Finish onboarding to add one."
       >
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <Stat label="Orders today" value={String(todays.length)} icon={ReceiptText} />
-          <Stat label="Live orders" value={String(live.length)} icon={Clock} />
-          <Stat label="Completed today" value={String(completedToday.length)} icon={CheckCircle2} />
-          <Stat label="Revenue today" value={money(revenueToday, currency)} icon={IndianRupee} />
+          <Stat label="Orders today" value={String(todays.length)} icon={ReceiptText} accent="primary" />
+          <Stat label="Live orders" value={String(live.length)} icon={Clock} accent="warning" />
+          <Stat label="Completed today" value={String(completedToday.length)} icon={CheckCircle2} accent="success" />
+          <Stat label="Revenue today" value={money(revenueToday, currency)} icon={IndianRupee} accent="accent" />
         </div>
 
         <div className="mt-8">
