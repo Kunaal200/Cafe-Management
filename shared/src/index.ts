@@ -11,3 +11,4 @@ export * from './schemas/subscription';
 export * from './schemas/coupons';
 export * from './schemas/customers';
 export * from './schemas/inventory';
+export * from './schemas/recipe';

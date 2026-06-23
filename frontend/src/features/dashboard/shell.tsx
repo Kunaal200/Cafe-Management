@@ -16,6 +16,7 @@ import {
   Ticket,
   MessageSquare,
   BarChart3,
+  TrendingUp,
   CreditCard,
   Settings,
   Monitor,
@@ -46,6 +47,7 @@ const NAV = [
   { href: "/dashboard/feedback", label: "Feedback", icon: MessageSquare, roles: ["owner", "manager"] },
   { href: "/dashboard/coupons", label: "Coupons", icon: Ticket, roles: ["owner", "manager"] },
   { href: "/dashboard/reports", label: "Reports", icon: BarChart3, roles: ["owner", "manager"] },
+  { href: "/dashboard/margins", label: "Margins", icon: TrendingUp, roles: ["owner", "manager"] },
   { href: "/dashboard/subscription", label: "Subscription", icon: CreditCard, roles: ["owner"] },
   { href: "/dashboard/settings", label: "Settings", icon: Settings },
 ];

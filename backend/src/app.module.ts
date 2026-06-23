@@ -23,6 +23,7 @@ import { ReportsModule } from './modules/reports/reports.module';
 import { CouponsModule } from './modules/coupons/coupons.module';
 import { CustomersModule } from './modules/customers/customers.module';
 import { InventoryModule } from './modules/inventory/inventory.module';
+import { RecipeModule } from './modules/recipe/recipe.module';
 import { AdminModule } from './modules/admin/admin.module';
 import { HealthModule } from './modules/health/health.module';
 
@@ -49,6 +50,7 @@ import { HealthModule } from './modules/health/health.module';
     CouponsModule,
     CustomersModule,
     InventoryModule,
+    RecipeModule,
     AdminModule,
     HealthModule,
   ],

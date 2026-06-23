@@ -239,6 +239,32 @@ export class InventoryService {
 
   // ---- helpers ----
 
+  /**
+   * Current unit cost per inventory item — weighted average of remaining batches,
+   * falling back to the most recent batch's cost. Returned as a Map(itemId -> cost).
+   */
+  async unitCostByItem(tenantId: string): Promise<Map<string, number>> {
+    const batches = await this.prisma.stockBatch.findMany({
+      where: { tenantId },
+      orderBy: { receivedAt: 'desc' },
+      select: { itemId: true, remainingQty: true, unitCost: true, receivedAt: true },
+    });
+    const agg = new Map<string, { qty: number; cost: number; latest?: number }>();
+    for (const b of batches) {
+      const cur = agg.get(b.itemId) ?? { qty: 0, cost: 0 };
+      const rem = Number(b.remainingQty);
+      cur.qty += rem;
+      cur.cost += rem * Number(b.unitCost);
+      if (cur.latest === undefined) cur.latest = Number(b.unitCost); // first seen = most recent
+      agg.set(b.itemId, cur);
+    }
+    const out = new Map<string, number>();
+    for (const [itemId, v] of agg) {
+      out.set(itemId, v.qty > 0 ? v.cost / v.qty : (v.latest ?? 0));
+    }
+    return out;
+  }
+
   /** Average daily consumption (out + waste) per item over the recent window. */
   private async consumptionByItem(tenantId: string): Promise<Map<string, number>> {
     const since = new Date(Date.now() - CONSUMPTION_WINDOW_DAYS * MS_PER_DAY);

@@ -231,6 +231,7 @@ model MenuItem {
   category   MenuCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   taxRule    TaxRule?     @relation(fields: [taxRuleId], references: [id])
   orderItems OrderItem[]
+  recipe     RecipeIngredient[]
 
   @@index([tenantId])
   @@index([categoryId])
@@ -423,6 +424,7 @@ model InventoryItem {
   tenant    Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   batches   StockBatch[]
   movements StockMovement[]
+  recipeUses RecipeIngredient[]
 
   @@index([tenantId])
   @@map("inventory_items")
@@ -461,4 +463,21 @@ model StockMovement {
   @@index([itemId])
   @@index([createdAt])
   @@map("stock_movements")
+}
+
+model RecipeIngredient {
+  id              String   @id @default(uuid())
+  tenantId        String
+  menuItemId      String
+  inventoryItemId String
+  qty             Decimal  @db.Decimal(12, 3) // amount used per one menu item, in the inventory item's unit
+  createdAt       DateTime @default(now())
+
+  menuItem      MenuItem      @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+  inventoryItem InventoryItem @relation(fields: [inventoryItemId], references: [id], onDelete: Cascade)
+
+  @@unique([menuItemId, inventoryItemId])
+  @@index([tenantId])
+  @@index([menuItemId])
+  @@map("recipe_ingredients")
 }
