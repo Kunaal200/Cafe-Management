@@ -92,6 +92,7 @@ model Tenant {
   taxRules      TaxRule[]
   customers     Customer[]
   coupons       Coupon[]
+  feedback      Feedback[]
   auditLogs     AuditLog[]
 
   @@map("tenants")
@@ -284,9 +285,26 @@ model Customer {
   tenant Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   orders Order[]
   coupons Coupon[]
+  feedback Feedback[]
 
   @@index([tenantId])
   @@map("customers")
+}
+
+model Feedback {
+  id         String   @id @default(uuid())
+  tenantId   String
+  customerId String?
+  orderId    String?
+  rating     Int
+  comment    String?
+  createdAt  DateTime @default(now())
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customer Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId])
+  @@map("feedback")
 }
 
 model Order {
