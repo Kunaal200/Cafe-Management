@@ -8,3 +8,4 @@ export * from './schemas/orders';
 export * from './schemas/payments';
 export * from './schemas/register';
 export * from './schemas/subscription';
+export * from './schemas/coupons';

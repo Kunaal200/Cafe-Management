@@ -34,6 +34,7 @@ export function CheckoutPanel({
   const [summaryLoading, setSummaryLoading] = useState(true);
   const [discountType, setDiscountType] = useState<"amount" | "percent">("amount");
   const [discountValue, setDiscountValue] = useState("");
+  const [couponCode, setCouponCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [payOpen, setPayOpen] = useState(false);
 
@@ -82,6 +83,25 @@ export function CheckoutPanel({
     }
   }
 
+  async function applyCoupon() {
+    if (!couponCode.trim()) return;
+    setBusy(true);
+    try {
+      await apiFetch(`/coupons/orders/${order.id}/apply`, {
+        method: "POST",
+        body: { code: couponCode.trim() },
+        auth: true,
+      });
+      setCouponCode("");
+      toast.success("Coupon applied");
+      onChanged();
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Could not apply coupon.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   const balance = summary?.balance ?? Number(order.total);
   const fullyPaid = balance <= 0;
 
@@ -111,6 +131,27 @@ export function CheckoutPanel({
             Apply
           </Button>
         </div>
+      </div>
+
+      {/* Coupon */}
+      <div>
+        <h3 className="mb-2 text-sm font-semibold text-text">Coupon</h3>
+        {order.couponCode ? (
+          <p className="text-sm text-muted">
+            Applied: <span className="font-medium text-text">{order.couponCode}</span>
+          </p>
+        ) : (
+          <div className="flex gap-2">
+            <Input
+              placeholder="Enter code"
+              value={couponCode}
+              onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+            />
+            <Button variant="secondary" onClick={applyCoupon} disabled={busy || !couponCode.trim()}>
+              Apply
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Balance summary */}

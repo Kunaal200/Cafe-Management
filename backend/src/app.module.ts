@@ -20,6 +20,7 @@ import { PaymentsModule } from './modules/payments/payments.module';
 import { RegisterModule } from './modules/register/register.module';
 import { SubscriptionModule } from './modules/subscription/subscription.module';
 import { ReportsModule } from './modules/reports/reports.module';
+import { CouponsModule } from './modules/coupons/coupons.module';
 import { AdminModule } from './modules/admin/admin.module';
 import { HealthModule } from './modules/health/health.module';
 
@@ -43,6 +44,7 @@ import { HealthModule } from './modules/health/health.module';
     RegisterModule,
     SubscriptionModule,
     ReportsModule,
+    CouponsModule,
     AdminModule,
     HealthModule,
   ],

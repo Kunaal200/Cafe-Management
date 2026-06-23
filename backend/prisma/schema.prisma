@@ -91,6 +91,7 @@ model Tenant {
   menuItems     MenuItem[]
   taxRules      TaxRule[]
   customers     Customer[]
+  coupons       Coupon[]
   auditLogs     AuditLog[]
 
   @@map("tenants")
@@ -162,6 +163,29 @@ model Subscription {
 
   @@index([tenantId])
   @@map("subscriptions")
+}
+
+model Coupon {
+  id             String    @id @default(uuid())
+  tenantId       String
+  code           String
+  type           String    @default("percent") // 'amount' | 'percent'
+  value          Decimal   @db.Decimal(10, 2)
+  minOrder       Decimal?  @db.Decimal(10, 2)
+  maxRedemptions Int?
+  redeemedCount  Int       @default(0)
+  customerId     String?
+  expiresAt      DateTime?
+  isActive       Boolean   @default(true)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customer Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@map("coupons")
 }
 
 model MenuCategory {
@@ -259,6 +283,7 @@ model Customer {
 
   tenant Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   orders Order[]
+  coupons Coupon[]
 
   @@index([tenantId])
   @@map("customers")
@@ -274,6 +299,7 @@ model Order {
   createdById String?
   type        OrderType   @default(dine_in)
   status      OrderStatus @default(open)
+  couponCode  String?
   subtotal    Decimal     @default(0) @db.Decimal(10, 2)
   taxTotal    Decimal     @default(0) @db.Decimal(10, 2)
   discount    Decimal     @default(0) @db.Decimal(10, 2)

@@ -49,6 +49,7 @@ export interface Order {
   tableId: string | null;
   type: OrderType;
   status: OrderStatus;
+  couponCode: string | null;
   subtotal: string;
   taxTotal: string;
   discount: string;
@@ -145,4 +146,18 @@ export interface ShiftReconciliation {
   expectedCash: number;
   countedCash: number;
   difference: number;
+}
+
+export interface Coupon {
+  id: string;
+  code: string;
+  type: "amount" | "percent";
+  value: string;
+  minOrder: string | null;
+  maxRedemptions: number | null;
+  redeemedCount: number;
+  customerId: string | null;
+  expiresAt: string | null;
+  isActive: boolean;
+  createdAt: string;
 }
