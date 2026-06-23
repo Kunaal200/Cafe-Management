@@ -21,7 +21,7 @@ const FOH = [UserRole.OWNER, UserRole.MANAGER, UserRole.CASHIER, UserRole.WAITER
 export class CustomersController {
   constructor(private readonly customers: CustomersService) {}
 
-  @Roles(UserRole.OWNER, UserRole.MANAGER)
+  @Roles(...FOH)
   @Get()
   list() {
     return this.customers.list();

@@ -13,6 +13,7 @@ import type {
 } from '@cafe/shared';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { getTenantContext, getTenantIdOrThrow } from '../../common/tenancy/tenant-context';
+import { InventoryService } from '../inventory/inventory.service';
 
 /**
  * Allowed order status transitions. Each key lists the statuses it may move to.
@@ -38,6 +39,7 @@ const ORDER_INCLUDE = {
   items: true,
   table: true,
   payments: true,
+  customer: true,
 } satisfies Prisma.OrderInclude;
 
 function round2(n: number): number {
@@ -46,7 +48,10 @@ function round2(n: number): number {
 
 @Injectable()
 export class OrdersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly inventory: InventoryService,
+  ) {}
 
   /** Create an order, optionally with initial line items. */
   async create(input: CreateOrderInput) {
@@ -141,6 +146,16 @@ export class OrdersService {
       }
     });
 
+    // Deduct recipe ingredients from inventory in real time (best-effort).
+    const items = await this.prisma.orderItem.findMany({
+      where: { orderId },
+      select: { menuItemId: true, qty: true },
+    });
+    await this.inventory.consumeForOrderItems(
+      items.map((i) => ({ menuItemId: i.menuItemId, qty: i.qty })),
+      `Order #${order.orderNumber}`,
+    );
+
     return this.getDetail(orderId);
   }
 
@@ -168,6 +183,21 @@ export class OrdersService {
       }
     });
 
+    return this.getDetail(orderId);
+  }
+
+  /** Attach (or clear) the customer on an order. */
+  async setCustomer(orderId: string, customerId: string | null) {
+    const order = await this.findOwned(orderId);
+    if (customerId) {
+      const customer = await this.prisma.customer.findFirst({
+        where: { id: customerId, tenantId: order.tenantId },
+      });
+      if (!customer) {
+        throw new NotFoundException('Customer not found');
+      }
+    }
+    await this.prisma.order.update({ where: { id: orderId }, data: { customerId } });
     return this.getDetail(orderId);
   }
 

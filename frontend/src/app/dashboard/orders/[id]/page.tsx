@@ -10,6 +10,7 @@ import { useSession } from "@/features/dashboard/session-context";
 import { useToast } from "@/features/dashboard/toast";
 import { PageHeader, Card, StateBlock } from "@/features/dashboard/ui";
 import { MenuCatalog } from "@/features/dashboard/order/menu-catalog";
+import { CustomerSelect } from "@/features/dashboard/customer-select";
 import { OrderCart } from "@/features/dashboard/order/order-cart";
 import { LifecycleActions } from "@/features/dashboard/order/lifecycle-actions";
 import { CheckoutPanel } from "@/features/dashboard/order/checkout-panel";
@@ -150,6 +151,19 @@ export default function OrderWorkspacePage() {
     );
   }
 
+  function setCustomer(customerId: string | null) {
+    if (!order) return;
+    run(
+      () =>
+        apiFetch(`/orders/${order.id}/customer`, {
+          method: "PATCH",
+          body: { customerId },
+          auth: true,
+        }),
+      customerId ? "Customer attached" : "Customer removed",
+    );
+  }
+
   return (
     <>
       <button
@@ -200,6 +214,17 @@ export default function OrderWorkspacePage() {
 
               {/* Right: cart + actions + checkout (full width if not building) */}
               <div className={isOpen ? "space-y-6" : "space-y-6 lg:col-span-3"}>
+                {!isTerminal && (
+                  <Card>
+                    <h2 className="mb-3 text-sm font-semibold text-text">Customer</h2>
+                    <CustomerSelect
+                      value={order.customer?.id ?? null}
+                      selectedLabel={order.customer?.name || order.customer?.phone || "Customer"}
+                      onSelect={(id) => setCustomer(id)}
+                    />
+                  </Card>
+                )}
+
                 <Card>
                   <h2 className="mb-3 text-sm font-semibold text-text">Order</h2>
                   <OrderCart

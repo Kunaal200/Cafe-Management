@@ -125,6 +125,15 @@ export function PaymentModal({
         </div>
       ) : (
         <div className="space-y-5">
+          {order.customer && (
+            <div className="flex items-center gap-2 rounded-md bg-surface-muted px-3 py-2 text-sm">
+              <span className="text-muted">Customer:</span>
+              <span className="font-medium text-text">
+                {order.customer.name || order.customer.phone || "—"}
+              </span>
+            </div>
+          )}
+
           {/* Balance */}
           <div className="rounded-lg bg-surface-muted p-4">
             <dl className="space-y-1 text-sm">

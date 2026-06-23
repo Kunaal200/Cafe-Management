@@ -48,3 +48,9 @@ export const updateOrderStatusSchema = z.object({
   status: z.enum(orderStatusValues),
 });
 export type UpdateOrderStatusInput = z.infer<typeof updateOrderStatusSchema>;
+
+/** Attach or clear the customer on an order. */
+export const setOrderCustomerSchema = z.object({
+  customerId: z.string().uuid().nullable(),
+});
+export type SetOrderCustomerInput = z.infer<typeof setOrderCustomerSchema>;

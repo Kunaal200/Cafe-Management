@@ -12,11 +12,13 @@ import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import {
   addOrderItemsSchema,
   createOrderSchema,
+  setOrderCustomerSchema,
   updateOrderItemSchema,
   updateOrderStatusSchema,
   UserRole,
   type AddOrderItemsInput,
   type CreateOrderInput,
+  type SetOrderCustomerInput,
   type UpdateOrderItemInput,
   type UpdateOrderStatusInput,
 } from '@cafe/shared';
@@ -84,6 +86,15 @@ export class OrdersController {
   @Post(':id/send-kitchen')
   sendToKitchen(@Param('id') id: string) {
     return this.orders.sendToKitchen(id);
+  }
+
+  @Roles(...FOH)
+  @Patch(':id/customer')
+  setCustomer(
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(setOrderCustomerSchema)) body: SetOrderCustomerInput,
+  ) {
+    return this.orders.setCustomer(id, body.customerId);
   }
 
   @Roles(...STATUS_CHANGERS)

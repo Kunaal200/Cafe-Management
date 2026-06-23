@@ -237,6 +237,78 @@ export class InventoryService {
     return alerts.sort((a, b) => rank[a.severity] - rank[b.severity]);
   }
 
+  // ---- Order-driven consumption ----
+
+  /**
+   * Deduct recipe ingredients for a set of order lines (best-effort, never throws
+   * so it can't block order flow). For each menu item with a recipe, the required
+   * ingredient quantity (per-unit × line qty) is consumed FIFO and logged as an
+   * 'out' movement, which also feeds the consumption-rate used by alerts.
+   */
+  async consumeForOrderItems(
+    lines: { menuItemId: string | null; qty: number }[],
+    reason?: string,
+  ): Promise<void> {
+    const tenantId = getTenantIdOrThrow();
+    const menuItemIds = lines.map((l) => l.menuItemId).filter((v): v is string => !!v);
+    if (menuItemIds.length === 0) return;
+
+    const recipes = await this.prisma.recipeIngredient.findMany({
+      where: { tenantId, menuItemId: { in: menuItemIds } },
+    });
+    if (recipes.length === 0) return;
+
+    // Aggregate the total required quantity per inventory item.
+    const need = new Map<string, number>();
+    for (const line of lines) {
+      if (!line.menuItemId) continue;
+      for (const r of recipes.filter((x) => x.menuItemId === line.menuItemId)) {
+        need.set(r.inventoryItemId, (need.get(r.inventoryItemId) ?? 0) + Number(r.qty) * line.qty);
+      }
+    }
+
+    for (const [itemId, qty] of need) {
+      try {
+        await this.deductBestEffort(tenantId, itemId, qty, reason);
+      } catch {
+        // Never block the order on an inventory hiccup.
+      }
+    }
+  }
+
+  /** Deduct up to `qty` from an item's batches (FIFO) and log the consumption. */
+  private async deductBestEffort(
+    tenantId: string,
+    itemId: string,
+    qty: number,
+    reason?: string,
+  ): Promise<void> {
+    const batches = await this.prisma.stockBatch.findMany({
+      where: { tenantId, itemId, remainingQty: { gt: 0 } },
+      orderBy: [{ expiresAt: 'asc' }, { receivedAt: 'asc' }],
+    });
+    let remaining = qty;
+    const updates: Prisma.PrismaPromise<unknown>[] = [];
+    for (const b of batches) {
+      if (remaining <= 0) break;
+      const take = Math.min(Number(b.remainingQty), remaining);
+      remaining -= take;
+      updates.push(
+        this.prisma.stockBatch.update({
+          where: { id: b.id },
+          data: { remainingQty: round(Number(b.remainingQty) - take) },
+        }),
+      );
+    }
+    // Record the full required quantity so consumption-rate stays accurate.
+    updates.push(
+      this.prisma.stockMovement.create({
+        data: { tenantId, itemId, type: 'out', qty: round(qty), reason: reason ?? 'Order consumption' },
+      }),
+    );
+    await this.prisma.$transaction(updates);
+  }
+
   // ---- helpers ----
 
   /**

@@ -33,6 +33,13 @@ export interface OrderTable {
   area: string | null;
 }
 
+export interface OrderCustomer {
+  id: string;
+  name: string | null;
+  phone: string | null;
+  email: string | null;
+}
+
 export interface Payment {
   id: string;
   method: string;
@@ -59,6 +66,7 @@ export interface Order {
   updatedAt: string;
   items: OrderItem[];
   table?: OrderTable | null;
+  customer?: OrderCustomer | null;
   payments?: Payment[];
 }
 

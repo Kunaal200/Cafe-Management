@@ -11,6 +11,7 @@ import { useApi } from "@/lib/use-api";
 import { apiFetch, ApiError } from "@/lib/api";
 import { useOutlet } from "./outlet-context";
 import { useToast } from "./toast";
+import { CustomerSelect } from "./customer-select";
 import type { Order, RestaurantTable } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -27,6 +28,8 @@ export function NewOrderModal({ open, onClose }: { open: boolean; onClose: () =>
 
   const [type, setType] = useState<string>(OrderType.DINE_IN);
   const [tableId, setTableId] = useState<string>("");
+  const [customerId, setCustomerId] = useState<string | null>(null);
+  const [customerLabel, setCustomerLabel] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -43,6 +46,7 @@ export function NewOrderModal({ open, onClose }: { open: boolean; onClose: () =>
     try {
       const body: Record<string, unknown> = { outletId: selected.id, type };
       if (type === OrderType.DINE_IN && tableId) body.tableId = tableId;
+      if (customerId) body.customerId = customerId;
       const order = await apiFetch<Order>("/orders", { method: "POST", body, auth: true });
       toast.success("Order created");
       onClose();
@@ -103,6 +107,17 @@ export function NewOrderModal({ open, onClose }: { open: boolean; onClose: () =>
               )}
             </Field>
           )}
+
+          <Field label="Customer (optional)" htmlFor="customer">
+            <CustomerSelect
+              value={customerId}
+              selectedLabel={customerLabel}
+              onSelect={(id, label) => {
+                setCustomerId(id);
+                setCustomerLabel(label ?? null);
+              }}
+            />
+          </Field>
 
           <div className="flex justify-end gap-2">
             <Button variant="ghost" onClick={onClose}>
