@@ -12,7 +12,7 @@ import { Badge } from "@/design-system/badge";
 import { Button } from "@/design-system/button";
 import { useApi } from "@/lib/use-api";
 import type { Order } from "@/lib/types";
-import { money, dateTime, humanize, orderStatusVariant } from "@/lib/format";
+import { money, dateTime, humanize, orderStatusVariant, isOrderPaid } from "@/lib/format";
 import { canTakeOrders } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
 
@@ -86,6 +86,7 @@ export default function OrdersPage() {
                 <th className="px-5 py-3 font-medium">Table / Type</th>
                 <th className="px-5 py-3 font-medium">Items</th>
                 <th className="px-5 py-3 font-medium">Total</th>
+                <th className="px-5 py-3 font-medium">Payment</th>
                 <th className="px-5 py-3 font-medium">Status</th>
                 <th className="px-5 py-3 font-medium">Created</th>
               </tr>
@@ -103,6 +104,11 @@ export default function OrdersPage() {
                   </td>
                   <td className="px-5 py-3 text-muted">{o.items.length}</td>
                   <td className="px-5 py-3 font-medium text-text">{money(o.total, currency)}</td>
+                  <td className="px-5 py-3">
+                    <Badge variant={isOrderPaid(o) ? "success" : "warning"}>
+                      {isOrderPaid(o) ? "Received" : "Pending"}
+                    </Badge>
+                  </td>
                   <td className="px-5 py-3">
                     <Badge variant={orderStatusVariant(o.status)}>{humanize(o.status)}</Badge>
                   </td>

@@ -5,12 +5,13 @@ import { OrderStatus } from "@cafe/shared";
 import { Button } from "@/design-system/button";
 import type { Order } from "@/lib/types";
 
-/** Status transitions reachable via PATCH /orders/:id/status. */
+/** Status transitions reachable via PATCH /orders/:id/status.
+ * Note: `served → completed` is intentionally NOT here — completing an order
+ * happens through Checkout (which takes payment first). */
 const NEXT_STATUS: Record<string, { status: string; label: string }[]> = {
   [OrderStatus.SENT_TO_KITCHEN]: [{ status: OrderStatus.PREPARING, label: "Start preparing" }],
   [OrderStatus.PREPARING]: [{ status: OrderStatus.READY, label: "Mark ready" }],
   [OrderStatus.READY]: [{ status: OrderStatus.SERVED, label: "Mark served" }],
-  [OrderStatus.SERVED]: [{ status: OrderStatus.COMPLETED, label: "Complete order" }],
 };
 
 const CANCELLABLE: string[] = [

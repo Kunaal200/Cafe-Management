@@ -214,6 +214,33 @@ export default function InventoryPage() {
         empty={list.length === 0}
         emptyText="No inventory items yet. Add ingredients like milk, beans, or syrups."
       >
+        {/* Stock levels graph */}
+        <Card className="mb-6">
+          <h2 className="mb-4 text-sm font-semibold text-text">Stock levels</h2>
+          <div className="space-y-3">
+            {list.map((it) => {
+              const maxStock = Math.max(1, ...list.map((x) => x.stockOnHand));
+              const pct = Math.max(2, Math.round((it.stockOnHand / maxStock) * 100));
+              return (
+                <div key={it.id}>
+                  <div className="mb-1 flex items-center justify-between text-sm">
+                    <span className="font-medium text-text">{it.name}</span>
+                    <span className="text-muted">
+                      {it.stockOnHand} {it.unit}
+                    </span>
+                  </div>
+                  <div className="h-2.5 overflow-hidden rounded-full bg-surface-muted">
+                    <div
+                      className={cn("h-full rounded-full", it.lowStock ? "bg-warning" : "bg-primary")}
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+
         <Card className="overflow-hidden p-0">
           <table className="w-full text-sm">
             <thead>

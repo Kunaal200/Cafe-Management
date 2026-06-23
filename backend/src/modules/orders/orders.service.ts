@@ -169,6 +169,18 @@ export class OrdersService {
       );
     }
 
+    // Completing an order closes the bill — require it to be fully paid first.
+    if (target === PrismaOrderStatus.completed) {
+      const payments = await this.prisma.payment.findMany({
+        where: { orderId, status: 'paid' },
+        select: { amount: true },
+      });
+      const paid = payments.reduce((sum, p) => sum + Number(p.amount), 0);
+      if (round2(Number(order.total) - paid) > 0) {
+        throw new BadRequestException('Collect payment before completing this order (use Checkout).');
+      }
+    }
+
     await this.prisma.$transaction(async (tx) => {
       await tx.order.update({
         where: { id: orderId },
@@ -210,7 +222,7 @@ export class OrdersService {
         ...(filters.outletId ? { outletId: filters.outletId } : {}),
         ...(filters.status ? { status: filters.status as PrismaOrderStatus } : {}),
       },
-      include: { items: true, table: true },
+      include: { items: true, table: true, payments: true },
       orderBy: { createdAt: 'desc' },
     });
   }

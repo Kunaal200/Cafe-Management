@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ReceiptText, Clock, CheckCircle2, IndianRupee, ArrowRight, Plus } from "lucide-react";
+import { ReceiptText, Clock, CheckCircle2, IndianRupee, ArrowRight, Plus, AlertTriangle } from "lucide-react";
 import { useOutlet } from "@/features/dashboard/outlet-context";
 import { useSession } from "@/features/dashboard/session-context";
 import { NewOrderModal } from "@/features/dashboard/new-order-modal";
@@ -11,9 +11,19 @@ import { Badge } from "@/design-system/badge";
 import { Button } from "@/design-system/button";
 import { useApi } from "@/lib/use-api";
 import type { Order } from "@/lib/types";
-import { money, timeAgo, humanize, orderStatusVariant, LIVE_STATUSES } from "@/lib/format";
+import { money, timeAgo, humanize, orderStatusVariant, LIVE_STATUSES, isOrderPaid } from "@/lib/format";
 import { canTakeOrders } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
+
+interface InvAlert {
+  itemId: string;
+  itemName: string;
+  type: string;
+  severity: "high" | "medium" | "low";
+  message: string;
+}
+
+const CAN_VIEW_INVENTORY = ["owner", "manager", "kitchen"];
 
 function isToday(iso: string): boolean {
   const d = new Date(iso);
@@ -75,6 +85,12 @@ export default function DashboardHome() {
     selected ? `/orders?outletId=${selected.id}` : null,
     { pollMs: 15000 },
   );
+  const canViewInventory = CAN_VIEW_INVENTORY.includes(session.role);
+  const { data: alertsData } = useApi<InvAlert[]>(
+    canViewInventory ? "/inventory/alerts" : null,
+    { pollMs: 60000 },
+  );
+  const alerts = alertsData ?? [];
 
   const orders = data ?? [];
   const todays = orders.filter((o) => isToday(o.createdAt));
@@ -95,6 +111,33 @@ export default function DashboardHome() {
           ) : undefined
         }
       />
+
+      {alerts.length > 0 && (
+        <Link
+          href="/dashboard/inventory"
+          className={cn(
+            "mb-6 flex items-start gap-3 rounded-lg border px-4 py-3 text-sm transition-colors",
+            alerts.some((a) => a.severity === "high")
+              ? "border-danger/30 bg-danger/10 hover:bg-danger/15"
+              : "border-warning/30 bg-warning/10 hover:bg-warning/15",
+          )}
+        >
+          <AlertTriangle
+            className={cn(
+              "mt-0.5 h-4 w-4 shrink-0",
+              alerts.some((a) => a.severity === "high") ? "text-danger" : "text-warning",
+            )}
+          />
+          <span className="flex-1 text-text">
+            <span className="font-medium">
+              {alerts.length} inventory alert{alerts.length === 1 ? "" : "s"}
+            </span>
+            {" · "}
+            {alerts[0].message}
+          </span>
+          <ArrowRight className="mt-0.5 h-4 w-4 shrink-0 text-muted" />
+        </Link>
+      )}
 
       <StateBlock
         loading={outletLoading || (loading && !data)}
@@ -147,6 +190,9 @@ export default function DashboardHome() {
                   </div>
                   <div className="flex items-center gap-3">
                     <span className="font-medium text-text">{money(o.total, currency)}</span>
+                    <Badge variant={isOrderPaid(o) ? "success" : "warning"}>
+                      {isOrderPaid(o) ? "Payment received" : "Payment pending"}
+                    </Badge>
                     <Badge variant={orderStatusVariant(o.status)}>{humanize(o.status)}</Badge>
                   </div>
                 </Link>

@@ -83,3 +83,16 @@ export function tableStatusVariant(status: TableStatus | string): BadgeVariant {
 
 /** Statuses considered "live" (active service) for the home feed. */
 export const LIVE_STATUSES = ["open", "sent_to_kitchen", "preparing", "ready", "served"] as const;
+
+/** Whether an order is fully paid, from its payments + total. */
+export function isOrderPaid(order: {
+  total: string | number;
+  payments?: { amount: string | number; status: string }[] | null;
+}): boolean {
+  const total = Number(order.total);
+  if (total <= 0) return false;
+  const paid = (order.payments ?? [])
+    .filter((p) => p.status === "paid")
+    .reduce((sum, p) => sum + Number(p.amount), 0);
+  return paid + 0.0001 >= total;
+}
